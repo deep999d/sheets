@@ -1,0 +1,208 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Legendary Homes Task Management API",
+    "version": "1.0.0",
+    "description": "API for managing construction tasks in Google Sheets"
+  },
+  "servers": [
+    {
+      "url": "https://your-project.vercel.app",
+      "description": "Replace with your actual Vercel deployment URL"
+    }
+  ],
+  "paths": {
+    "/api/tasks": {
+      "post": {
+        "operationId": "add_task_to_sheets",
+        "summary": "Add a new task to Google Sheets",
+        "description": "Adds a task to both the Master Tasks tab and the project-specific tab",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Project/home name (e.g., 'Grandin', 'Maple Street')"
+                  },
+                  "area": {
+                    "type": "string",
+                    "description": "Area of the home (e.g., 'Kitchen', 'Master Bath', 'Rear Retaining Wall')"
+                  },
+                  "trade": {
+                    "type": "string",
+                    "description": "Trade/subcontractor type (e.g., 'Masonry', 'Tile', 'Plumbing', 'Electrical', 'Carpentry')"
+                  },
+                  "taskTitle": {
+                    "type": "string",
+                    "description": "Brief task title (e.g., 'Chipped Block', 'Leaky Faucet')"
+                  },
+                  "taskDetails": {
+                    "type": "string",
+                    "description": "Detailed description of the task"
+                  },
+                  "assignedTo": {
+                    "type": "string",
+                    "description": "Person or company assigned (e.g., 'Masonry', 'John Smith', 'ABC Plumbing')"
+                  },
+                  "priority": {
+                    "type": "string",
+                    "enum": ["Low", "Medium", "High", "Urgent"],
+                    "description": "Task priority level",
+                    "default": "Medium"
+                  },
+                  "dueDate": {
+                    "type": "string",
+                    "description": "Due date in YYYY-MM-DD format"
+                  },
+                  "photoNeeded": {
+                    "type": "boolean",
+                    "description": "Whether a photo is needed for this task",
+                    "default": false
+                  }
+                },
+                "required": ["project", "taskTitle", "trade", "assignedTo"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Task added successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "task": {
+                      "type": "object",
+                      "properties": {
+                        "success": {"type": "boolean"},
+                        "taskId": {"type": "string"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required fields"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "get": {
+        "operationId": "get_tasks",
+        "summary": "Get tasks with optional filters",
+        "description": "Retrieves tasks from Google Sheets, optionally filtered by project, trade, assignedTo, or status",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "schema": {"type": "string"},
+            "description": "Filter by project name"
+          },
+          {
+            "name": "trade",
+            "in": "query",
+            "schema": {"type": "string"},
+            "description": "Filter by trade"
+          },
+          {
+            "name": "assignedTo",
+            "in": "query",
+            "schema": {"type": "string"},
+            "description": "Filter by assigned person/company"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["Open", "In Progress", "Completed"]
+            },
+            "description": "Filter by task status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tasks retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "count": {"type": "number"},
+                    "tasks": {"type": "array"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects": {
+      "post": {
+        "operationId": "create_project_tab",
+        "summary": "Create a new project tab in the Google Sheet",
+        "description": "Creates a new tab for a project if it doesn't already exist",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "projectName": {
+                    "type": "string",
+                    "description": "Name of the new project"
+                  }
+                },
+                "required": ["projectName"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Project tab created successfully"
+          },
+          "400": {
+            "description": "Bad request - projectName is required"
+          }
+        }
+      }
+    },
+    "/api/subcontractor/{assignedTo}": {
+      "get": {
+        "operationId": "get_subcontractor_tasks",
+        "summary": "Get all open tasks for a specific subcontractor",
+        "description": "Gets all open tasks for a specific subcontractor/trade for email generation",
+        "parameters": [
+          {
+            "name": "assignedTo",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"},
+            "description": "Subcontractor name or trade"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subcontractor tasks retrieved successfully"
+          }
+        }
+      }
+    }
+  }
+}
+

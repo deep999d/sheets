@@ -1,0 +1,40 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/tasks",
+      "methods": ["GET", "POST", "OPTIONS"],
+      "dest": "/api/tasks.js"
+    },
+    {
+      "src": "/api/subcontractor/(?<assignedTo>[^/]+)",
+      "methods": ["GET", "OPTIONS"],
+      "dest": "/api/subcontractor.js?assignedTo=$assignedTo"
+    },
+    {
+      "src": "/api/projects",
+      "methods": ["POST", "OPTIONS"],
+      "dest": "/api/projects.js"
+    },
+    {
+      "src": "/api/emails/weekly",
+      "methods": ["POST", "OPTIONS"],
+      "dest": "/api/emails/weekly.js"
+    },
+    {
+      "src": "/health",
+      "methods": ["GET"],
+      "dest": "/api/health.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
+}
+

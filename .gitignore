@@ -8,7 +8,6 @@ package-lock.json
 .env.*.local
 
 # Google Service Account Keys
-*.json
 !package.json
 !package-lock.json
 service-account-key.json
@@ -43,5 +42,3 @@ temp/
 # Vercel
 .vercel
 
-# Demo exports
-demo-export/
