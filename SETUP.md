@@ -149,9 +149,14 @@ Vercel is where your API will live. It's free for this use case.
    - Value: The Sheet ID you copied in Step 1
    - Environment: Production, Preview, Development (check all three)
 
-   **GOOGLE_SERVICE_ACCOUNT_KEY**
+   **GOOGLE_SERVICE_ACCOUNT_KEY** (IMPORTANT - Read carefully!)
    - Name: `GOOGLE_SERVICE_ACCOUNT_KEY`
-   - Value: Open the JSON file you downloaded in Step 2.4, copy the ENTIRE contents (all of it, including the curly braces)
+   - Value: Open the JSON file you downloaded in Step 2.4
+     - Copy the ENTIRE file contents (everything from the opening `{` to the closing `}`)
+     - Paste it as ONE continuous string
+     - **DO NOT** paste a file path like `./legendary-home-xxx.json` or `legendary-home-xxx.json`
+     - **DO** paste the actual JSON content like: `{"type":"service_account","project_id":"...",...}`
+     - Note: For local development, you can use a file path in your `.env` file, but for Vercel you MUST use the JSON content
    - Environment: Production, Preview, Development (check all three)
 
    **Optional - Email Settings** (only if you want email automation):
