@@ -375,10 +375,9 @@ async function setupSheetFormatting(auth, sheetName) {
   });
   
   // Set up formula for Days Old column (column B, index 1)
-  // Formula: =IF(A2="","",ROUNDDOWN((TODAY()-DATEVALUE(A2)),0))
-  // We'll apply this to existing rows and it will auto-fill for new rows
-  const formulaRange = `${sheetName}!B2:B1000`;
-  const formula = '=IF(A2="","",ROUNDDOWN((TODAY()-DATEVALUE(A2)),0))';
+  // Formula handles ISO timestamps (2025-12-17T20:55:06.116Z) by extracting date part
+  // Formula: =IF(A2="","",ROUNDDOWN((TODAY()-DATEVALUE(LEFT(A2,10))),0))
+  // This extracts YYYY-MM-DD from ISO timestamp before the 'T'
   
   // Get current row count to apply formula
   const valuesResponse = await sheets.spreadsheets.values.get({
@@ -392,7 +391,8 @@ async function setupSheetFormatting(auth, sheetName) {
     // Apply formula to existing rows
     const formulas = [];
     for (let i = 2; i <= rowCount; i++) {
-      formulas.push([`=IF(A${i}="","",ROUNDDOWN((TODAY()-DATEVALUE(A${i})),0))`]);
+      // Extract date part (first 10 characters: YYYY-MM-DD) from ISO timestamp
+      formulas.push([`=IF(A${i}="","",ROUNDDOWN((TODAY()-DATEVALUE(LEFT(A${i},10))),0))`]);
     }
     
     await sheets.spreadsheets.values.update({
@@ -418,11 +418,10 @@ async function applyRowFormatting(auth, projectName) {
     if (rowCount < 2) return; // No data rows yet
     
     const lastRow = rowCount;
-    const sheetId = (await sheets.spreadsheets.get({ auth, spreadsheetId: SPREADSHEET_ID }))
-      .data.sheets.find(s => s.properties.title === projectName).properties.sheetId;
     
     // Apply Days Old formula to the new row
-    const formula = `=IF(A${lastRow}="","",ROUNDDOWN((TODAY()-DATEVALUE(A${lastRow})),0))`;
+    // Extract date part (first 10 characters: YYYY-MM-DD) from ISO timestamp
+    const formula = `=IF(A${lastRow}="","",ROUNDDOWN((TODAY()-DATEVALUE(LEFT(A${lastRow},10))),0))`;
     await sheets.spreadsheets.values.update({
       auth,
       spreadsheetId: SPREADSHEET_ID,
