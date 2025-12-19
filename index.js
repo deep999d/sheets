@@ -13,7 +13,12 @@ async function processTaskInput(taskData) {
 
 async function processMultipleTasks(tasksArray) {
   try {
-    const results = await Promise.all(tasksArray.map(task => addTaskToSheets(task)));
+    // Process tasks sequentially to avoid race conditions with row counting
+    const results = [];
+    for (const task of tasksArray) {
+      const result = await addTaskToSheets(task);
+      results.push(result);
+    }
     return { 
       success: true, 
       tasksCreated: results.length,
