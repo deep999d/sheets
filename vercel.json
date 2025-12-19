@@ -23,6 +23,11 @@
       "dest": "/api/projects.js"
     },
     {
+      "src": "/api/initialize",
+      "methods": ["POST", "OPTIONS"],
+      "dest": "/api/initialize.js"
+    },
+    {
       "src": "/api/emails/weekly",
       "methods": ["POST", "OPTIONS"],
       "dest": "/api/emails/weekly.js"
