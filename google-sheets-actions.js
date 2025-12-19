@@ -3,6 +3,7 @@ const sheets = google.sheets('v4');
 
 const SPREADSHEET_ID = process.env.GOOGLE_SHEET_ID;
 const MASTER_TAB_NAME = 'Master Tasks';
+const CONTRACTORS_TAB_NAME = 'Contractors';
 
 async function getSheetsClient() {
   const keyContent = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
@@ -63,8 +64,11 @@ async function addTaskToSheets(taskData) {
 
   const auth = await getSheetsClient();
   const timestamp = new Date().toISOString();
+  // Days Old will be calculated by formula, so we leave it empty for now
+  // Formula will be: =IF(A2="","",ROUNDDOWN((TODAY()-DATEVALUE(A2)),0))
   const row = [
     timestamp,
+    '', // Days Old - will be filled by formula
     taskData.project || '',
     taskData.area || '',
     taskData.trade || '',
@@ -93,8 +97,14 @@ async function addTaskToSheets(taskData) {
     };
 
     await Promise.all([
-      appendRow(`${MASTER_TAB_NAME}!A:M`),
-      appendRow(`${taskData.project}!A:M`),
+      appendRow(`${MASTER_TAB_NAME}!A:N`),
+      appendRow(`${taskData.project}!A:N`),
+    ]);
+
+    // Apply formula for Days Old after row is added
+    await Promise.all([
+      applyRowFormatting(auth, MASTER_TAB_NAME),
+      applyRowFormatting(auth, taskData.project),
     ]);
 
     return { success: true, taskId: timestamp };
@@ -106,34 +116,56 @@ async function addTaskToSheets(taskData) {
   }
 }
 
-async function ensureProjectTabExists(auth, projectName) {
+async function ensureContractorsTabExists(auth) {
   const sheetsClient = sheets.spreadsheets;
   
   try {
     const spreadsheet = await sheetsClient.get({ auth, spreadsheetId: SPREADSHEET_ID });
     const existingTabs = spreadsheet.data.sheets.map(s => s.properties.title);
     
-    if (existingTabs.includes(projectName)) return;
+    if (existingTabs.includes(CONTRACTORS_TAB_NAME)) {
+      // Check if headers exist
+      const response = await sheets.spreadsheets.values.get({
+        auth,
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${CONTRACTORS_TAB_NAME}!A1:D1`,
+      });
+      
+      if (!response.data.values || response.data.values.length === 0) {
+        // Headers don't exist, add them
+        const headers = ['Contractor Name', 'Email', 'Phone', 'Trade'];
+        await sheets.spreadsheets.values.update({
+          auth,
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${CONTRACTORS_TAB_NAME}!A1:D1`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [headers] },
+        });
+      }
+      return;
+    }
 
+    // Create Contractors tab
     await sheetsClient.batchUpdate({
       auth,
       spreadsheetId: SPREADSHEET_ID,
       resource: {
-        requests: [{ addSheet: { properties: { title: projectName } } }],
+        requests: [{ addSheet: { properties: { title: CONTRACTORS_TAB_NAME } } }],
       },
     });
 
-    const headers = ['Timestamp', 'Project', 'Area', 'Trade', 'Task Title', 'Task Details', 'Assigned To', 'Priority', 'Due Date', 'Photo Needed', 'Status', 'Photo URL', 'Notes'];
+    const headers = ['Contractor Name', 'Email', 'Phone', 'Trade'];
     await sheets.spreadsheets.values.update({
       auth,
       spreadsheetId: SPREADSHEET_ID,
-      range: `${projectName}!A1:M1`,
+      range: `${CONTRACTORS_TAB_NAME}!A1:D1`,
       valueInputOption: 'USER_ENTERED',
       resource: { values: [headers] },
     });
 
+    // Format headers
     const updatedSpreadsheet = await sheetsClient.get({ auth, spreadsheetId: SPREADSHEET_ID });
-    const sheetId = updatedSpreadsheet.data.sheets.find(s => s.properties.title === projectName).properties.sheetId;
+    const sheetId = updatedSpreadsheet.data.sheets.find(s => s.properties.title === CONTRACTORS_TAB_NAME).properties.sheetId;
     await sheetsClient.batchUpdate({
       auth,
       spreadsheetId: SPREADSHEET_ID,
@@ -153,10 +185,254 @@ async function ensureProjectTabExists(auth, projectName) {
       },
     });
   } catch (error) {
+    console.error('Error ensuring Contractors tab exists:', error);
+    // Don't throw - this is not critical
+  }
+}
+
+async function ensureProjectTabExists(auth, projectName) {
+  const sheetsClient = sheets.spreadsheets;
+  
+  try {
+    // Ensure Contractors tab exists first
+    await ensureContractorsTabExists(auth);
+    
+    const spreadsheet = await sheetsClient.get({ auth, spreadsheetId: SPREADSHEET_ID });
+    const existingTabs = spreadsheet.data.sheets.map(s => s.properties.title);
+    
+    if (existingTabs.includes(projectName)) {
+      // Check if headers need updating
+      const response = await sheets.spreadsheets.values.get({
+        auth,
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${projectName}!A1:N1`,
+      });
+      
+      if (!response.data.values || response.data.values[0]?.length < 14) {
+        // Headers need updating
+        await setupSheetHeaders(auth, projectName);
+      }
+      return;
+    }
+
+    await sheetsClient.batchUpdate({
+      auth,
+      spreadsheetId: SPREADSHEET_ID,
+      resource: {
+        requests: [{ addSheet: { properties: { title: projectName } } }],
+      },
+    });
+
+    await setupSheetHeaders(auth, projectName);
+    await setupSheetFormatting(auth, projectName);
+  } catch (error) {
     if (error.message.includes('Requested entity was not found')) {
       throw new Error(`Google Sheet not found. Check: 1) Sheet ID is correct (${SPREADSHEET_ID}), 2) Sheet is shared with service account email, 3) Sheet exists. Original error: ${error.message}`);
     }
     throw error;
+  }
+}
+
+async function setupSheetHeaders(auth, sheetName) {
+  const headers = ['Timestamp', 'Days Old', 'Project', 'Area', 'Trade', 'Task Title', 'Task Details', 'Assigned To', 'Priority', 'Due Date', 'Photo Needed', 'Status', 'Photo URL', 'Notes'];
+  await sheets.spreadsheets.values.update({
+    auth,
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${sheetName}!A1:N1`,
+    valueInputOption: 'USER_ENTERED',
+    resource: { values: [headers] },
+  });
+}
+
+async function setupSheetFormatting(auth, sheetName) {
+  const sheetsClient = sheets.spreadsheets;
+  const spreadsheet = await sheetsClient.get({ auth, spreadsheetId: SPREADSHEET_ID });
+  const sheetId = spreadsheet.data.sheets.find(s => s.properties.title === sheetName).properties.sheetId;
+  
+  const requests = [];
+  
+  // Format header row
+  requests.push({
+    repeatCell: {
+      range: { sheetId, startRowIndex: 0, endRowIndex: 1 },
+      cell: {
+        userEnteredFormat: {
+          backgroundColor: { red: 0.2, green: 0.4, blue: 0.6 },
+          textFormat: { foregroundColor: { red: 1, green: 1, blue: 1 }, bold: true },
+        },
+      },
+      fields: 'userEnteredFormat(backgroundColor,textFormat)',
+    },
+  });
+  
+  // Data validation for Status column (column L, index 11)
+  requests.push({
+    setDataValidation: {
+      range: {
+        sheetId,
+        startRowIndex: 1, // Start from row 2 (0-indexed, so 1)
+        endRowIndex: 1000, // Up to row 1000
+        startColumnIndex: 11, // Column L (Status)
+        endColumnIndex: 12,
+      },
+      rule: {
+        condition: {
+          type: 'ONE_OF_LIST',
+          values: [
+            { userEnteredValue: 'Open' },
+            { userEnteredValue: 'In Progress' },
+            { userEnteredValue: 'Closed' },
+          ],
+        },
+        showCustomUi: true,
+        strict: false,
+      },
+    },
+  });
+  
+  // Data validation for Assigned To column (column H, index 7) - pull from Contractors tab
+  requests.push({
+    setDataValidation: {
+      range: {
+        sheetId,
+        startRowIndex: 1,
+        endRowIndex: 1000,
+        startColumnIndex: 7, // Column H (Assigned To)
+        endColumnIndex: 8,
+      },
+      rule: {
+        condition: {
+          type: 'ONE_OF_RANGE',
+          values: [{
+            userEnteredValue: `=${CONTRACTORS_TAB_NAME}!A2:A1000`, // Contractor names from Contractors tab
+          }],
+        },
+        showCustomUi: true,
+        strict: false,
+      },
+    },
+  });
+  
+  // Conditional formatting for Status column (green for Closed, red for Open)
+  // Green for Closed
+  requests.push({
+    addConditionalFormatRule: {
+      rule: {
+        ranges: [{
+          sheetId,
+          startRowIndex: 1,
+          endRowIndex: 1000,
+          startColumnIndex: 11, // Status column
+          endColumnIndex: 12,
+        }],
+        booleanRule: {
+          condition: {
+            type: 'TEXT_EQ',
+            values: [{ userEnteredValue: 'Closed' }],
+          },
+          format: {
+            backgroundColor: { red: 0.85, green: 0.95, blue: 0.85 }, // Light green
+          },
+        },
+      },
+      index: 0,
+    },
+  });
+  
+  // Red for Open
+  requests.push({
+    addConditionalFormatRule: {
+      rule: {
+        ranges: [{
+          sheetId,
+          startRowIndex: 1,
+          endRowIndex: 1000,
+          startColumnIndex: 11, // Status column
+          endColumnIndex: 12,
+        }],
+        booleanRule: {
+          condition: {
+            type: 'TEXT_EQ',
+            values: [{ userEnteredValue: 'Open' }],
+          },
+          format: {
+            backgroundColor: { red: 0.95, green: 0.85, blue: 0.85 }, // Light red
+          },
+        },
+      },
+      index: 1,
+    },
+  });
+  
+  // Sort by Days Old (oldest first) - this will be applied to the entire data range
+  // Note: We'll set up a filter view for this instead of sorting the data directly
+  // as sorting can interfere with new data additions
+  
+  await sheetsClient.batchUpdate({
+    auth,
+    spreadsheetId: SPREADSHEET_ID,
+    resource: { requests },
+  });
+  
+  // Set up formula for Days Old column (column B, index 1)
+  // Formula: =IF(A2="","",ROUNDDOWN((TODAY()-DATEVALUE(A2)),0))
+  // We'll apply this to existing rows and it will auto-fill for new rows
+  const formulaRange = `${sheetName}!B2:B1000`;
+  const formula = '=IF(A2="","",ROUNDDOWN((TODAY()-DATEVALUE(A2)),0))';
+  
+  // Get current row count to apply formula
+  const valuesResponse = await sheets.spreadsheets.values.get({
+    auth,
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${sheetName}!A:A`,
+  });
+  
+  const rowCount = (valuesResponse.data.values || []).length;
+  if (rowCount > 1) {
+    // Apply formula to existing rows
+    const formulas = [];
+    for (let i = 2; i <= rowCount; i++) {
+      formulas.push([`=IF(A${i}="","",ROUNDDOWN((TODAY()-DATEVALUE(A${i})),0))`]);
+    }
+    
+    await sheets.spreadsheets.values.update({
+      auth,
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheetName}!B2:B${rowCount}`,
+      valueInputOption: 'USER_ENTERED',
+      resource: { values: formulas },
+    });
+  }
+}
+
+async function applyRowFormatting(auth, projectName) {
+  try {
+    // Get the last row number
+    const response = await sheets.spreadsheets.values.get({
+      auth,
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${projectName}!A:A`,
+    });
+    
+    const rowCount = (response.data.values || []).length;
+    if (rowCount < 2) return; // No data rows yet
+    
+    const lastRow = rowCount;
+    const sheetId = (await sheets.spreadsheets.get({ auth, spreadsheetId: SPREADSHEET_ID }))
+      .data.sheets.find(s => s.properties.title === projectName).properties.sheetId;
+    
+    // Apply Days Old formula to the new row
+    const formula = `=IF(A${lastRow}="","",ROUNDDOWN((TODAY()-DATEVALUE(A${lastRow})),0))`;
+    await sheets.spreadsheets.values.update({
+      auth,
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${projectName}!B${lastRow}`,
+      valueInputOption: 'USER_ENTERED',
+      resource: { values: [[formula]] },
+    });
+  } catch (error) {
+    console.error('Error applying row formatting:', error);
+    // Don't throw - this is not critical
   }
 }
 
@@ -171,7 +447,7 @@ async function getTasks(filters = {}) {
     const response = await sheets.spreadsheets.values.get({
       auth,
       spreadsheetId: SPREADSHEET_ID,
-      range: `${MASTER_TAB_NAME}!A:M`,
+      range: `${MASTER_TAB_NAME}!A:N`,
     });
 
     const rows = response.data.values || [];
@@ -205,8 +481,42 @@ async function getSubcontractorTasks(assignedTo) {
 }
 
 async function createProjectTab(projectName) {
-  await ensureProjectTabExists(await getSheetsClient(), projectName);
+  const auth = await getSheetsClient();
+  await ensureProjectTabExists(auth, projectName);
   return { success: true, message: `Project tab '${projectName}' created successfully` };
+}
+
+async function initializeMasterTab() {
+  const auth = await getSheetsClient();
+  const sheetsClient = sheets.spreadsheets;
+  
+  try {
+    // Ensure Contractors tab exists first
+    await ensureContractorsTabExists(auth);
+    
+    const spreadsheet = await sheetsClient.get({ auth, spreadsheetId: SPREADSHEET_ID });
+    const existingTabs = spreadsheet.data.sheets.map(s => s.properties.title);
+    
+    if (!existingTabs.includes(MASTER_TAB_NAME)) {
+      // Create Master Tasks tab
+      await sheetsClient.batchUpdate({
+        auth,
+        spreadsheetId: SPREADSHEET_ID,
+        resource: {
+          requests: [{ addSheet: { properties: { title: MASTER_TAB_NAME } } }],
+        },
+      });
+    }
+    
+    // Setup headers and formatting for Master Tasks tab
+    await setupSheetHeaders(auth, MASTER_TAB_NAME);
+    await setupSheetFormatting(auth, MASTER_TAB_NAME);
+    
+    return { success: true, message: 'Master tab and Contractors tab initialized successfully' };
+  } catch (error) {
+    console.error('Error initializing Master tab:', error);
+    throw error;
+  }
 }
 
 module.exports = {
@@ -214,6 +524,8 @@ module.exports = {
   getTasks,
   getSubcontractorTasks,
   createProjectTab,
+  initializeMasterTab,
+  ensureContractorsTabExists,
 };
 
 

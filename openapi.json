@@ -15,56 +15,79 @@
     "/api/tasks": {
       "post": {
         "operationId": "add_task_to_sheets",
-        "summary": "Add a new task to Google Sheets",
-        "description": "Adds a task to both the Master Tasks tab and the project-specific tab",
+        "summary": "Add a new task or multiple tasks to Google Sheets",
+        "description": "Adds task(s) to both the Master Tasks tab and project-specific tabs. Can accept a single task object or an array of tasks for batch processing.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "project": {
-                    "type": "string",
-                    "description": "Project/home name (e.g., 'Grandin', 'Maple Street')"
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "project": {
+                        "type": "string",
+                        "description": "Project/home name (e.g., 'Grandin', 'Maple Street')"
+                      },
+                      "area": {
+                        "type": "string",
+                        "description": "Area of the home (e.g., 'Kitchen', 'Master Bath', 'Rear Retaining Wall')"
+                      },
+                      "trade": {
+                        "type": "string",
+                        "description": "Trade/subcontractor type (e.g., 'Masonry', 'Tile', 'Plumbing', 'Electrical', 'Carpentry')"
+                      },
+                      "taskTitle": {
+                        "type": "string",
+                        "description": "Brief task title (e.g., 'Chipped Block', 'Leaky Faucet')"
+                      },
+                      "taskDetails": {
+                        "type": "string",
+                        "description": "Detailed description of the task"
+                      },
+                      "assignedTo": {
+                        "type": "string",
+                        "description": "Person or company assigned (e.g., 'Masonry', 'John Smith', 'ABC Plumbing')"
+                      },
+                      "priority": {
+                        "type": "string",
+                        "enum": ["Low", "Medium", "High", "Urgent"],
+                        "description": "Task priority level",
+                        "default": "Medium"
+                      },
+                      "dueDate": {
+                        "type": "string",
+                        "description": "Due date in YYYY-MM-DD format"
+                      },
+                      "photoNeeded": {
+                        "type": "boolean",
+                        "description": "Whether a photo is needed for this task",
+                        "default": false
+                      }
+                    },
+                    "required": ["project", "taskTitle", "trade", "assignedTo"]
                   },
-                  "area": {
-                    "type": "string",
-                    "description": "Area of the home (e.g., 'Kitchen', 'Master Bath', 'Rear Retaining Wall')"
-                  },
-                  "trade": {
-                    "type": "string",
-                    "description": "Trade/subcontractor type (e.g., 'Masonry', 'Tile', 'Plumbing', 'Electrical', 'Carpentry')"
-                  },
-                  "taskTitle": {
-                    "type": "string",
-                    "description": "Brief task title (e.g., 'Chipped Block', 'Leaky Faucet')"
-                  },
-                  "taskDetails": {
-                    "type": "string",
-                    "description": "Detailed description of the task"
-                  },
-                  "assignedTo": {
-                    "type": "string",
-                    "description": "Person or company assigned (e.g., 'Masonry', 'John Smith', 'ABC Plumbing')"
-                  },
-                  "priority": {
-                    "type": "string",
-                    "enum": ["Low", "Medium", "High", "Urgent"],
-                    "description": "Task priority level",
-                    "default": "Medium"
-                  },
-                  "dueDate": {
-                    "type": "string",
-                    "description": "Due date in YYYY-MM-DD format"
-                  },
-                  "photoNeeded": {
-                    "type": "boolean",
-                    "description": "Whether a photo is needed for this task",
-                    "default": false
+                  {
+                    "type": "array",
+                    "description": "Array of tasks for batch processing",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "project": {"type": "string"},
+                        "area": {"type": "string"},
+                        "trade": {"type": "string"},
+                        "taskTitle": {"type": "string"},
+                        "taskDetails": {"type": "string"},
+                        "assignedTo": {"type": "string"},
+                        "priority": {"type": "string", "enum": ["Low", "Medium", "High", "Urgent"]},
+                        "dueDate": {"type": "string"},
+                        "photoNeeded": {"type": "boolean"}
+                      },
+                      "required": ["project", "taskTitle", "trade", "assignedTo"]
+                    }
                   }
-                },
-                "required": ["project", "taskTitle", "trade", "assignedTo"]
+                ]
               }
             }
           }

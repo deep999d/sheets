@@ -1,4 +1,4 @@
-const { processTaskInput, getFilteredTasks } = require('../index');
+const { processTaskInput, processMultipleTasks, getFilteredTasks } = require('../index');
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -9,6 +9,9 @@ module.exports = async (req, res) => {
 
   try {
     if (req.method === 'POST') {
+      if (Array.isArray(req.body)) {
+        return res.json(await processMultipleTasks(req.body));
+      }
       if (!req.body.project || !req.body.taskTitle) {
         return res.status(400).json({ success: false, error: 'Project and taskTitle are required' });
       }

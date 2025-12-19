@@ -28,5 +28,6 @@ AI-powered task management system that converts natural language input into stru
 ## Documentation
 
 - [SETUP.md](SETUP.md) - Complete setup guide for non-technical users
+- [TEST_POST.md](TEST_POST.md) - How to test POST /api/tasks endpoint
 - `custom-gpt-config.json` - Custom GPT configuration
 - `openapi.json` - OpenAPI schema for Custom GPT Actions

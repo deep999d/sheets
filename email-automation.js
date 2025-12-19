@@ -12,7 +12,17 @@ class EmailAutomation {
       fromName: config.fromName || 'Legendary Homes Task Management',
     };
 
-    this.subcontractorEmails = config.subcontractorEmails || {};
+    // Support contractor emails from environment variable or config
+    if (process.env.CONTRACTOR_EMAILS) {
+      try {
+        this.subcontractorEmails = JSON.parse(process.env.CONTRACTOR_EMAILS);
+      } catch (e) {
+        console.warn('Failed to parse CONTRACTOR_EMAILS from environment variable:', e.message);
+        this.subcontractorEmails = config.subcontractorEmails || {};
+      }
+    } else {
+      this.subcontractorEmails = config.subcontractorEmails || {};
+    }
   }
 
   generateEmailContent(tasks, subcontractorName) {

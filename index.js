@@ -1,4 +1,4 @@
-const { addTaskToSheets, getTasks, getSubcontractorTasks, createProjectTab } = require('./google-sheets-actions');
+const { addTaskToSheets, getTasks, getSubcontractorTasks, createProjectTab, initializeMasterTab } = require('./google-sheets-actions');
 const EmailAutomation = require('./email-automation');
 
 async function processTaskInput(taskData) {
@@ -7,6 +7,20 @@ async function processTaskInput(taskData) {
     return { success: true, task: result };
   } catch (error) {
     console.error('Error processing task input:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function processMultipleTasks(tasksArray) {
+  try {
+    const results = await Promise.all(tasksArray.map(task => addTaskToSheets(task)));
+    return { 
+      success: true, 
+      tasksCreated: results.length,
+      tasks: results 
+    };
+  } catch (error) {
+    console.error('Error processing multiple tasks:', error);
     return { success: false, error: error.message };
   }
 }
@@ -94,6 +108,7 @@ async function sendWeeklyEmails(config) {
 
 module.exports = {
   processTaskInput,
+  processMultipleTasks,
   getFilteredTasks,
   getSubcontractorTaskList,
   createNewProjectTab,
@@ -101,7 +116,8 @@ module.exports = {
   addTaskToSheets,
   getTasks,
   getSubcontractorTasks,
-  createProjectTab
+  createProjectTab,
+  initializeMasterTab
 };
 
 if (require.main === module) {
@@ -119,6 +135,14 @@ if (require.main === module) {
   });
 
   app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+  app.post('/api/initialize', async (req, res) => {
+    try {
+      const result = await initializeMasterTab();
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
   app.post('/api/tasks', async (req, res) => {
     if (!req.body.project || !req.body.taskTitle) return res.status(400).json({ error: 'Project and taskTitle are required' });
     try {
