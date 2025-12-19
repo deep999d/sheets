@@ -28,6 +28,11 @@
       "dest": "/api/initialize.js"
     },
     {
+      "src": "/api/contractors",
+      "methods": ["POST", "OPTIONS"],
+      "dest": "/api/contractors.js"
+    },
+    {
       "src": "/api/emails/weekly",
       "methods": ["POST", "OPTIONS"],
       "dest": "/api/emails/weekly.js"

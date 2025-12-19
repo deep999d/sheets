@@ -519,6 +519,34 @@ async function initializeMasterTab() {
   }
 }
 
+async function addContractor(contractorData) {
+  const auth = await getSheetsClient();
+  
+  try {
+    await ensureContractorsTabExists(auth);
+    
+    const row = [
+      contractorData.name || '',
+      contractorData.email || '',
+      contractorData.phone || '',
+      contractorData.trade || '',
+    ];
+    
+    await sheets.spreadsheets.values.append({
+      auth,
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${CONTRACTORS_TAB_NAME}!A:D`,
+      valueInputOption: 'USER_ENTERED',
+      resource: { values: [row] },
+    });
+    
+    return { success: true, message: `Contractor '${contractorData.name}' added successfully` };
+  } catch (error) {
+    console.error('Error adding contractor:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   addTaskToSheets,
   getTasks,
@@ -526,6 +554,7 @@ module.exports = {
   createProjectTab,
   initializeMasterTab,
   ensureContractorsTabExists,
+  addContractor,
 };
 
 

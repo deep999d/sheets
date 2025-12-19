@@ -1,4 +1,4 @@
-const { addTaskToSheets, getTasks, getSubcontractorTasks, createProjectTab, initializeMasterTab } = require('./google-sheets-actions');
+const { addTaskToSheets, getTasks, getSubcontractorTasks, createProjectTab, initializeMasterTab, addContractor } = require('./google-sheets-actions');
 const EmailAutomation = require('./email-automation');
 
 async function processTaskInput(taskData) {
@@ -86,6 +86,25 @@ async function createNewProjectTab(projectName) {
 }
 
 /**
+ * Add a new contractor to the Contractors tab
+ */
+async function addNewContractor(contractorData) {
+  try {
+    const result = await addContractor(contractorData);
+    return {
+      success: true,
+      ...result
+    };
+  } catch (error) {
+    console.error('Error adding contractor:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
  * Send weekly emails to all subcontractors
  */
 async function sendWeeklyEmails(config) {
@@ -117,7 +136,8 @@ module.exports = {
   getTasks,
   getSubcontractorTasks,
   createProjectTab,
-  initializeMasterTab
+  initializeMasterTab,
+  addContractor: addNewContractor
 };
 
 if (require.main === module) {
@@ -141,6 +161,14 @@ if (require.main === module) {
       res.json(result);
     } catch (error) {
       res.status(500).json({ success: false, error: error.message });
+    }
+  });
+  app.post('/api/contractors', async (req, res) => {
+    if (!req.body.name) return res.status(400).json({ error: 'Contractor name is required' });
+    try {
+      res.json(await addNewContractor(req.body));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
     }
   });
   app.post('/api/tasks', async (req, res) => {
