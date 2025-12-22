@@ -1,4 +1,4 @@
-const { addTaskToSheets, getTasks, getSubcontractorTasks, createProjectTab, initializeMasterTab, addContractor } = require('./google-sheets-actions');
+const { addTaskToSheets, getTasks, getSubcontractorTasks, createProjectTab, initializeMasterTab, addContractor, updateTask } = require('./google-sheets-actions');
 const EmailAutomation = require('./email-automation');
 
 async function processTaskInput(taskData) {
@@ -142,7 +142,8 @@ module.exports = {
   getSubcontractorTasks,
   createProjectTab,
   initializeMasterTab,
-  addContractor: addNewContractor
+  addContractor: addNewContractor,
+  updateTaskInSheets
 };
 
 if (require.main === module) {
@@ -153,7 +154,7 @@ if (require.main === module) {
   app.use(express.json());
   app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type');
     if (req.method === 'OPTIONS') return res.sendStatus(200);
     next();
@@ -177,9 +178,20 @@ if (require.main === module) {
     }
   });
   app.post('/api/tasks', async (req, res) => {
+    if (Array.isArray(req.body)) {
+      return res.json(await processMultipleTasks(req.body));
+    }
     if (!req.body.project || !req.body.taskTitle) return res.status(400).json({ error: 'Project and taskTitle are required' });
     try {
       res.json(await processTaskInput(req.body));
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  app.put('/api/tasks', async (req, res) => {
+    if (!req.body.taskId) return res.status(400).json({ error: 'taskId is required' });
+    try {
+      res.json(await updateTaskInSheets(req.body.taskId, req.body));
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

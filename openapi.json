@@ -171,6 +171,103 @@
             }
           }
         }
+      },
+      "put": {
+        "operationId": "update_task",
+        "summary": "Update an existing task in Google Sheets",
+        "description": "Updates a task by its taskId (timestamp). Only provided fields will be updated. Updates both Master Tasks tab and project-specific tab.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "taskId": {
+                    "type": "string",
+                    "description": "Task ID (timestamp from when task was created) - required to identify which task to update"
+                  },
+                  "area": {
+                    "type": "string",
+                    "description": "Area of the home"
+                  },
+                  "trade": {
+                    "type": "string",
+                    "description": "Trade/subcontractor type"
+                  },
+                  "taskTitle": {
+                    "type": "string",
+                    "description": "Brief task title"
+                  },
+                  "taskDetails": {
+                    "type": "string",
+                    "description": "Detailed description of the task"
+                  },
+                  "assignedTo": {
+                    "type": "string",
+                    "description": "Person or company assigned"
+                  },
+                  "priority": {
+                    "type": "string",
+                    "enum": ["Low", "Medium", "High", "Urgent"],
+                    "description": "Task priority level"
+                  },
+                  "dueDate": {
+                    "type": "string",
+                    "description": "Due date in YYYY-MM-DD format"
+                  },
+                  "photoNeeded": {
+                    "type": "boolean",
+                    "description": "Whether a photo is needed for this task"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["Open", "In Progress", "Closed"],
+                    "description": "Task status"
+                  },
+                  "photoUrl": {
+                    "type": "string",
+                    "description": "URL to photo"
+                  },
+                  "notes": {
+                    "type": "string",
+                    "description": "Additional notes"
+                  }
+                },
+                "required": ["taskId"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Task updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "success": {"type": "boolean"},
+                        "message": {"type": "string"},
+                        "taskId": {"type": "string"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - taskId is required"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
       }
     },
     "/api/projects": {
@@ -222,6 +319,64 @@
         "responses": {
           "200": {
             "description": "Subcontractor tasks retrieved successfully"
+          }
+        }
+      }
+    },
+    "/api/contractors": {
+      "post": {
+        "operationId": "add_contractor",
+        "summary": "Add a new contractor to the Contractors tab",
+        "description": "Adds a contractor to the Contractors tab, which will then appear in the Assigned To dropdown for tasks",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Contractor name (e.g., 'ABC Plumbing', 'John Smith')"
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "Contractor email address (for weekly email summaries)"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "description": "Contractor phone number"
+                  },
+                  "trade": {
+                    "type": "string",
+                    "description": "Trade type (e.g., 'Plumbing', 'Masonry', 'Tile')"
+                  }
+                },
+                "required": ["name"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contractor added successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {"type": "boolean"},
+                    "message": {"type": "string"}
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - name is required"
+          },
+          "500": {
+            "description": "Server error"
           }
         }
       }

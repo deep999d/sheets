@@ -546,6 +546,112 @@ async function addContractor(contractorData) {
   }
 }
 
+async function updateTask(taskId, updateData) {
+  if (!SPREADSHEET_ID) {
+    throw new Error('GOOGLE_SHEET_ID environment variable is not set');
+  }
+
+  const auth = await getSheetsClient();
+  
+  try {
+    // Get all tasks to find the one to update
+    const response = await sheets.spreadsheets.values.get({
+      auth,
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${MASTER_TAB_NAME}!A:N`,
+    });
+
+    const rows = response.data.values || [];
+    if (rows.length < 2) {
+      throw new Error('No tasks found');
+    }
+
+    const headers = rows[0];
+    let taskRowIndex = -1;
+    let taskRow = null;
+    let projectName = '';
+
+    // Find the task by timestamp (taskId) in column A
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][0] === taskId) {
+        taskRowIndex = i + 1; // +1 because sheets are 1-indexed
+        taskRow = [...rows[i]]; // Copy the row
+        projectName = rows[i][2] || ''; // Project is in column C (index 2)
+        break;
+      }
+    }
+
+    if (taskRowIndex === -1) {
+      throw new Error(`Task with ID ${taskId} not found`);
+    }
+
+    // Update the row with new data (only update provided fields)
+    // Column mapping: A=timestamp, B=daysOld (formula), C=project, D=area, E=trade, F=taskTitle, G=taskDetails, H=assignedTo, I=priority, J=dueDate, K=photoNeeded, L=status, M=photoUrl, N=notes
+    if (updateData.area !== undefined) taskRow[3] = updateData.area;
+    if (updateData.trade !== undefined) taskRow[4] = updateData.trade;
+    if (updateData.taskTitle !== undefined) taskRow[5] = updateData.taskTitle;
+    if (updateData.taskDetails !== undefined) taskRow[6] = updateData.taskDetails;
+    if (updateData.assignedTo !== undefined) taskRow[7] = updateData.assignedTo;
+    if (updateData.priority !== undefined) taskRow[8] = updateData.priority;
+    if (updateData.dueDate !== undefined) taskRow[9] = updateData.dueDate;
+    if (updateData.photoNeeded !== undefined) taskRow[10] = updateData.photoNeeded ? 'Yes' : 'No';
+    if (updateData.status !== undefined) taskRow[11] = updateData.status;
+    if (updateData.photoUrl !== undefined) taskRow[12] = updateData.photoUrl;
+    if (updateData.notes !== undefined) taskRow[13] = updateData.notes;
+
+    // Ensure row has 14 columns
+    while (taskRow.length < 14) {
+      taskRow.push('');
+    }
+
+    // Update in Master Tasks tab
+    await sheets.spreadsheets.values.update({
+      auth,
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${MASTER_TAB_NAME}!A${taskRowIndex}:N${taskRowIndex}`,
+      valueInputOption: 'USER_ENTERED',
+      resource: { values: [taskRow] },
+    });
+
+    // Update in project tab if project name exists
+    if (projectName) {
+      // Find the row in project tab
+      const projectResponse = await sheets.spreadsheets.values.get({
+        auth,
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${projectName}!A:N`,
+      });
+
+      const projectRows = projectResponse.data.values || [];
+      let projectRowIndex = -1;
+
+      for (let i = 1; i < projectRows.length; i++) {
+        if (projectRows[i][0] === taskId) {
+          projectRowIndex = i + 1;
+          break;
+        }
+      }
+
+      if (projectRowIndex !== -1) {
+        await sheets.spreadsheets.values.update({
+          auth,
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${projectName}!A${projectRowIndex}:N${projectRowIndex}`,
+          valueInputOption: 'USER_ENTERED',
+          resource: { values: [taskRow] },
+        });
+      }
+    }
+
+    return { success: true, message: `Task updated successfully`, taskId };
+  } catch (error) {
+    if (error.message.includes('Requested entity was not found')) {
+      throw new Error(`Google Sheet not found. Check: 1) Sheet ID is correct (current: ${SPREADSHEET_ID}), 2) Sheet is shared with service account email, 3) Sheet exists. Original error: ${error.message}`);
+    }
+    throw error;
+  }
+}
+
 module.exports = {
   addTaskToSheets,
   getTasks,
@@ -554,6 +660,7 @@ module.exports = {
   initializeMasterTab,
   ensureContractorsTabExists,
   addContractor,
+  updateTask,
 };
 
 

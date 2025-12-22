@@ -9,7 +9,7 @@
   "routes": [
     {
       "src": "/api/tasks",
-      "methods": ["GET", "POST", "OPTIONS"],
+      "methods": ["GET", "POST", "PUT", "OPTIONS"],
       "dest": "/api/tasks.js"
     },
     {

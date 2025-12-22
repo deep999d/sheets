@@ -1,8 +1,8 @@
-const { processTaskInput, processMultipleTasks, getFilteredTasks } = require('../index');
+const { processTaskInput, processMultipleTasks, getFilteredTasks, updateTaskInSheets } = require('../index');
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -18,6 +18,13 @@ module.exports = async (req, res) => {
       return res.json(await processTaskInput(req.body));
     }
     
+    if (req.method === 'PUT') {
+      if (!req.body.taskId) {
+        return res.status(400).json({ success: false, error: 'taskId is required' });
+      }
+      return res.json(await updateTaskInSheets(req.body.taskId, req.body));
+    }
+    
     if (req.method === 'GET') {
       return res.json(await getFilteredTasks(req.query));
     }
@@ -28,4 +35,3 @@ module.exports = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
-

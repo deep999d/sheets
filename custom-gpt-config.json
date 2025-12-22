@@ -117,7 +117,9 @@
     "Show me all open tasks for Masonry.",
     "Create a new project called Maple Street.",
     "What are my urgent tasks for today?",
-    "Grandin project: kitchen tile work, assign to Tile, due Friday. Also, rear wall chipped block, assign to Masonry, urgent. And master bath needs plumbing fix, assign to ABC Plumbing."
+    "Grandin project: kitchen tile work, assign to Tile, due Friday. Also, rear wall chipped block, assign to Masonry, urgent. And master bath needs plumbing fix, assign to ABC Plumbing.",
+    "Mark the kitchen tile work task as Closed.",
+    "Add a new contractor: ABC Plumbing, email abc@plumbing.com, trade Plumbing."
   ]
 }
 
