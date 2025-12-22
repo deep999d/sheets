@@ -9,9 +9,15 @@ module.exports = async (req, res) => {
 
   try {
     if (req.method === 'POST') {
+      // Support both direct array format and wrapped format with 'tasks' property
       if (Array.isArray(req.body)) {
         return res.json(await processMultipleTasks(req.body));
       }
+      // Support wrapped format: { tasks: [...] }
+      if (req.body.tasks && Array.isArray(req.body.tasks)) {
+        return res.json(await processMultipleTasks(req.body.tasks));
+      }
+      // Single task object (direct format)
       if (!req.body.project || !req.body.taskTitle) {
         return res.status(400).json({ success: false, error: 'Project and taskTitle are required' });
       }
