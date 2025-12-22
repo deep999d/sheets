@@ -2,7 +2,7 @@ const { getSubcontractorTasks } = require('./google-sheets-actions');
 const nodemailer = require('nodemailer');
 
 class EmailAutomation {
-  constructor(config) {
+  constructor(config = {}) {
     this.config = {
       smtpHost: config.smtpHost || process.env.SMTP_HOST,
       smtpPort: config.smtpPort || process.env.SMTP_PORT || 587,
@@ -18,10 +18,10 @@ class EmailAutomation {
         this.subcontractorEmails = JSON.parse(process.env.CONTRACTOR_EMAILS);
       } catch (e) {
         console.warn('Failed to parse CONTRACTOR_EMAILS from environment variable:', e.message);
-        this.subcontractorEmails = config.subcontractorEmails || {};
+        this.subcontractorEmails = (config && config.subcontractorEmails) ? config.subcontractorEmails : {};
       }
     } else {
-      this.subcontractorEmails = config.subcontractorEmails || {};
+      this.subcontractorEmails = (config && config.subcontractorEmails) ? config.subcontractorEmails : {};
     }
   }
 
@@ -220,8 +220,26 @@ class EmailAutomation {
   }
 
   async sendWeeklyEmails() {
+    // Handle case where subcontractorEmails is not initialized or empty
+    if (!this.subcontractorEmails || typeof this.subcontractorEmails !== 'object') {
+      console.warn('No subcontractor emails configured');
+      return [{
+        success: false,
+        error: 'No subcontractor emails configured. Please set CONTRACTOR_EMAILS environment variable or provide subcontractorEmails in config.'
+      }];
+    }
+
+    const contractorNames = Object.keys(this.subcontractorEmails);
+    if (contractorNames.length === 0) {
+      console.warn('No contractors found in subcontractorEmails');
+      return [{
+        success: false,
+        error: 'No contractors configured. Please add contractors with email addresses.'
+      }];
+    }
+
     return Promise.all(
-      Object.keys(this.subcontractorEmails).map(name => this.sendEmailToSubcontractor(name))
+      contractorNames.map(name => this.sendEmailToSubcontractor(name))
     );
   }
 

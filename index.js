@@ -1,3 +1,12 @@
+// Load environment variables from .env file in local development
+if (require.main === module && !process.env.VERCEL) {
+  try {
+    require('dotenv').config();
+  } catch (e) {
+    // dotenv is optional
+  }
+}
+
 const { addTaskToSheets, getTasks, getSubcontractorTasks, createProjectTab, initializeMasterTab, addContractor, updateTask } = require('./google-sheets-actions');
 const EmailAutomation = require('./email-automation');
 
