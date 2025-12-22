@@ -1,27 +1,34 @@
-const { getSubcontractorTasks } = require('./google-sheets-actions');
+const { getSubcontractorTasks, getContractorEmails } = require('./google-sheets-actions');
 const nodemailer = require('nodemailer');
 
 class EmailAutomation {
   constructor(config = {}) {
+    const smtpUser = config.smtpUser || process.env.SMTP_USER;
+    const fromEmail = config.fromEmail || process.env.FROM_EMAIL || smtpUser || 'tasks@legendaryhomes.com';
+    
     this.config = {
       smtpHost: config.smtpHost || process.env.SMTP_HOST,
       smtpPort: config.smtpPort || process.env.SMTP_PORT || 587,
-      smtpUser: config.smtpUser || process.env.SMTP_USER,
+      smtpUser: smtpUser,
       smtpPassword: config.smtpPassword || process.env.SMTP_PASSWORD,
-      fromEmail: config.fromEmail || process.env.FROM_EMAIL || 'tasks@legendaryhomes.com',
-      fromName: config.fromName || 'Legendary Homes Task Management',
+      fromEmail: fromEmail,
+      fromName: config.fromName || process.env.FROM_NAME || 'Legendary Homes Task Management',
     };
 
-    // Support contractor emails from environment variable or config
-    if (process.env.CONTRACTOR_EMAILS) {
+    // Store config for contractor emails (fallback if sheet fetch fails)
+    // Priority: config > env variable > empty (will fetch from sheet)
+    if (config && config.subcontractorEmails) {
+      this.subcontractorEmails = config.subcontractorEmails;
+    } else if (process.env.CONTRACTOR_EMAILS) {
       try {
         this.subcontractorEmails = JSON.parse(process.env.CONTRACTOR_EMAILS);
       } catch (e) {
         console.warn('Failed to parse CONTRACTOR_EMAILS from environment variable:', e.message);
-        this.subcontractorEmails = (config && config.subcontractorEmails) ? config.subcontractorEmails : {};
+        this.subcontractorEmails = {};
       }
     } else {
-      this.subcontractorEmails = (config && config.subcontractorEmails) ? config.subcontractorEmails : {};
+      // Will be fetched from Google Sheets
+      this.subcontractorEmails = {};
     }
   }
 
@@ -198,6 +205,16 @@ class EmailAutomation {
       return { skipped: true, message: 'Email configuration not set up. Task saved to Google Sheets only.' };
     }
 
+    // Validate FROM_EMAIL is set and not a service account email
+    if (!this.config.fromEmail || this.config.fromEmail.includes('.iam.gserviceaccount.com')) {
+      console.warn('FROM_EMAIL not set or is a service account email. Using SMTP_USER instead.');
+      this.config.fromEmail = this.config.smtpUser;
+    }
+
+    if (!this.config.fromEmail) {
+      throw new Error('FROM_EMAIL must be set. Please set FROM_EMAIL environment variable or use SMTP_USER email.');
+    }
+
     try {
       const transporter = nodemailer.createTransport({
         host: this.config.smtpHost,
@@ -206,38 +223,69 @@ class EmailAutomation {
         auth: { user: this.config.smtpUser, pass: this.config.smtpPassword },
       });
 
-      return await transporter.sendMail({
+      const mailOptions = {
         from: `"${this.config.fromName}" <${this.config.fromEmail}>`,
         to,
         subject: emailContent.subject,
         text: emailContent.text,
         html: emailContent.html,
-      });
+      };
+
+      console.log(`Sending email from ${this.config.fromEmail} to ${to}`);
+      const result = await transporter.sendMail(mailOptions);
+      console.log(`Email sent successfully. Message ID: ${result.messageId}`);
+      return result;
     } catch (error) {
       console.error('Email send failed:', error.message);
+      console.error('Error details:', error);
       return { error: true, message: error.message };
     }
   }
 
   async sendWeeklyEmails() {
-    // Handle case where subcontractorEmails is not initialized or empty
-    if (!this.subcontractorEmails || typeof this.subcontractorEmails !== 'object') {
-      console.warn('No subcontractor emails configured');
+    // Fetch contractor emails from Google Sheets if not provided in config/env
+    let contractorEmails = this.subcontractorEmails;
+    
+    // If no emails configured, fetch from Google Sheets
+    if (!contractorEmails || Object.keys(contractorEmails).length === 0) {
+      try {
+        console.log('No contractor emails in config/env. Fetching from Google Sheets...');
+        contractorEmails = await getContractorEmails();
+        console.log(`Fetched ${Object.keys(contractorEmails).length} contractor(s) from Google Sheets`);
+      } catch (error) {
+        const errorMsg = `Failed to fetch contractor emails from Google Sheets: ${error.message}. Please ensure contractors are added to the Contractors tab with email addresses, or set CONTRACTOR_EMAILS environment variable.`;
+        console.error(errorMsg);
+        return [{
+          success: false,
+          error: errorMsg
+        }];
+      }
+    }
+
+    // Validate we have contractor emails
+    if (!contractorEmails || typeof contractorEmails !== 'object') {
+      const errorMsg = 'No subcontractor emails configured. Please add contractors to the Contractors tab in Google Sheets with email addresses, or set CONTRACTOR_EMAILS environment variable.';
+      console.error(errorMsg);
       return [{
         success: false,
-        error: 'No subcontractor emails configured. Please set CONTRACTOR_EMAILS environment variable or provide subcontractorEmails in config.'
+        error: errorMsg
       }];
     }
 
-    const contractorNames = Object.keys(this.subcontractorEmails);
+    const contractorNames = Object.keys(contractorEmails);
     if (contractorNames.length === 0) {
-      console.warn('No contractors found in subcontractorEmails');
+      const errorMsg = 'No contractors with email addresses found. Please add contractors to the Contractors tab in Google Sheets (Column A: Name, Column B: Email).';
+      console.error(errorMsg);
       return [{
         success: false,
-        error: 'No contractors configured. Please add contractors with email addresses.'
+        error: errorMsg
       }];
     }
 
+    // Update instance variable for use in sendEmailToSubcontractor
+    this.subcontractorEmails = contractorEmails;
+
+    console.log(`Sending weekly emails to ${contractorNames.length} contractor(s): ${contractorNames.join(', ')}`);
     return Promise.all(
       contractorNames.map(name => this.sendEmailToSubcontractor(name))
     );

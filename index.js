@@ -139,6 +139,25 @@ async function sendWeeklyEmails(config) {
   }
 }
 
+/**
+ * Update an existing task in Google Sheets
+ */
+async function updateTaskInSheets(taskId, updateData) {
+  try {
+    const result = await updateTask(taskId, updateData);
+    return {
+      success: true,
+      ...result
+    };
+  } catch (error) {
+    console.error('Error updating task:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
 module.exports = {
   processTaskInput,
   processMultipleTasks,

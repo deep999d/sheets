@@ -518,6 +518,47 @@ async function initializeMasterTab() {
   }
 }
 
+async function getContractorEmails() {
+  if (!SPREADSHEET_ID) {
+    throw new Error('GOOGLE_SHEET_ID environment variable is not set');
+  }
+
+  const auth = await getSheetsClient();
+  
+  try {
+    await ensureContractorsTabExists(auth);
+    
+    const response = await sheets.spreadsheets.values.get({
+      auth,
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${CONTRACTORS_TAB_NAME}!A:B`, // Get Name (A) and Email (B) columns
+    });
+
+    const rows = response.data.values || [];
+    if (rows.length < 2) {
+      // Only headers, no contractors
+      return {};
+    }
+
+    // Skip header row (row 0), map contractor name -> email
+    const contractorEmails = {};
+    for (let i = 1; i < rows.length; i++) {
+      const name = rows[i][0]?.trim();
+      const email = rows[i][1]?.trim();
+      
+      // Only include contractors with both name and email
+      if (name && email) {
+        contractorEmails[name] = email;
+      }
+    }
+
+    return contractorEmails;
+  } catch (error) {
+    console.error('Error getting contractor emails:', error);
+    throw error;
+  }
+}
+
 async function addContractor(contractorData) {
   const auth = await getSheetsClient();
   
@@ -660,6 +701,7 @@ module.exports = {
   initializeMasterTab,
   ensureContractorsTabExists,
   addContractor,
+  getContractorEmails,
   updateTask,
 };
 
