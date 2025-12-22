@@ -1,18 +1,15 @@
 {
   "name": "legendary-homes-task-manager",
   "version": "1.0.0",
-  "description": "AI-powered construction task management system with Google Sheets integration",
+  "description": "Construction task management system with Google Sheets integration",
   "main": "index.js",
   "scripts": {
-    "test": "node natural-language-parser.js",
-    "send-emails": "node email-automation.js",
     "start": "node index.js"
   },
   "keywords": [
     "construction",
     "task-management",
     "google-sheets",
-    "ai",
     "automation"
   ],
   "author": "Legendary Homes",

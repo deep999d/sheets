@@ -12,7 +12,6 @@ async function getSheetsClient() {
     throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY environment variable is not set');
   }
 
-  // If it's a JSON string (starts with {), parse it (for Vercel/serverless)
   if (keyContent.trim().startsWith('{')) {
     try {
       const keyData = JSON.parse(keyContent);
@@ -21,22 +20,18 @@ async function getSheetsClient() {
         scopes: ['https://www.googleapis.com/auth/spreadsheets'],
       });
     } catch (e) {
-      throw new Error(`Failed to parse GOOGLE_SERVICE_ACCOUNT_KEY as JSON: ${e.message}. Make sure you pasted the entire JSON content, not a file path.`);
+      throw new Error(`Failed to parse GOOGLE_SERVICE_ACCOUNT_KEY as JSON: ${e.message}`);
     }
   }
 
-  // If it's a file path (for local development)
-  // Remove ./ prefix if present, handle both ./file.json and file.json
   const fs = require('fs');
   const path = require('path');
   let filePath = keyContent.trim();
   
-  // Remove ./ prefix if present
   if (filePath.startsWith('./')) {
     filePath = filePath.substring(2);
   }
   
-  // Check if file exists (for local development)
   const fullPath = path.resolve(process.cwd(), filePath);
   if (fs.existsSync(fullPath)) {
     return new google.auth.GoogleAuth({
@@ -45,12 +40,10 @@ async function getSheetsClient() {
     });
   }
 
-  // If we're on Vercel/serverless and it's a file path, that won't work
   if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
-    throw new Error(`GOOGLE_SERVICE_ACCOUNT_KEY is set to a file path (${keyContent}), but file paths don't work on serverless platforms. You need to paste the entire JSON content as a string in the environment variable.`);
+    throw new Error(`GOOGLE_SERVICE_ACCOUNT_KEY is set to a file path, but file paths don't work on serverless platforms. Paste the entire JSON content as a string.`);
   }
 
-  // Last resort: try the path as-is
   return new google.auth.GoogleAuth({
     keyFile: filePath,
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
@@ -64,11 +57,9 @@ async function addTaskToSheets(taskData) {
 
   const auth = await getSheetsClient();
   const timestamp = new Date().toISOString();
-  // Days Old will be calculated by formula, so we leave it empty for now
-  // Formula will be: =IF(A2="","",ROUNDDOWN((TODAY()-DATEVALUE(A2)),0))
   const row = [
     timestamp,
-    '', // Days Old - will be filled by formula
+    '',
     taskData.project || '',
     taskData.area || '',
     taskData.trade || '',
@@ -101,7 +92,6 @@ async function addTaskToSheets(taskData) {
       appendRow(`${taskData.project}!A:N`),
     ]);
 
-    // Apply formula for Days Old after row is added
     await Promise.all([
       applyRowFormatting(auth, MASTER_TAB_NAME),
       applyRowFormatting(auth, taskData.project),
@@ -124,7 +114,6 @@ async function ensureContractorsTabExists(auth) {
     const existingTabs = spreadsheet.data.sheets.map(s => s.properties.title);
     
     if (existingTabs.includes(CONTRACTORS_TAB_NAME)) {
-      // Check if headers exist
       const response = await sheets.spreadsheets.values.get({
         auth,
         spreadsheetId: SPREADSHEET_ID,
@@ -132,7 +121,6 @@ async function ensureContractorsTabExists(auth) {
       });
       
       if (!response.data.values || response.data.values.length === 0) {
-        // Headers don't exist, add them
         const headers = ['Contractor Name', 'Email', 'Phone', 'Trade'];
         await sheets.spreadsheets.values.update({
           auth,
@@ -145,7 +133,6 @@ async function ensureContractorsTabExists(auth) {
       return;
     }
 
-    // Create Contractors tab
     await sheetsClient.batchUpdate({
       auth,
       spreadsheetId: SPREADSHEET_ID,
@@ -163,7 +150,6 @@ async function ensureContractorsTabExists(auth) {
       resource: { values: [headers] },
     });
 
-    // Format headers
     const updatedSpreadsheet = await sheetsClient.get({ auth, spreadsheetId: SPREADSHEET_ID });
     const sheetId = updatedSpreadsheet.data.sheets.find(s => s.properties.title === CONTRACTORS_TAB_NAME).properties.sheetId;
     await sheetsClient.batchUpdate({
@@ -186,7 +172,6 @@ async function ensureContractorsTabExists(auth) {
     });
   } catch (error) {
     console.error('Error ensuring Contractors tab exists:', error);
-    // Don't throw - this is not critical
   }
 }
 
@@ -194,14 +179,12 @@ async function ensureProjectTabExists(auth, projectName) {
   const sheetsClient = sheets.spreadsheets;
   
   try {
-    // Ensure Contractors tab exists first
     await ensureContractorsTabExists(auth);
     
     const spreadsheet = await sheetsClient.get({ auth, spreadsheetId: SPREADSHEET_ID });
     const existingTabs = spreadsheet.data.sheets.map(s => s.properties.title);
     
     if (existingTabs.includes(projectName)) {
-      // Check if headers need updating
       const response = await sheets.spreadsheets.values.get({
         auth,
         spreadsheetId: SPREADSHEET_ID,
@@ -209,7 +192,6 @@ async function ensureProjectTabExists(auth, projectName) {
       });
       
       if (!response.data.values || response.data.values[0]?.length < 14) {
-        // Headers need updating
         await setupSheetHeaders(auth, projectName);
       }
       return;
@@ -251,7 +233,6 @@ async function setupSheetFormatting(auth, sheetName) {
   
   const requests = [];
   
-  // Format header row
   requests.push({
     repeatCell: {
       range: { sheetId, startRowIndex: 0, endRowIndex: 1 },
@@ -265,14 +246,13 @@ async function setupSheetFormatting(auth, sheetName) {
     },
   });
   
-  // Data validation for Status column (column L, index 11)
   requests.push({
     setDataValidation: {
       range: {
         sheetId,
-        startRowIndex: 1, // Start from row 2 (0-indexed, so 1)
-        endRowIndex: 1000, // Up to row 1000
-        startColumnIndex: 11, // Column L (Status)
+        startRowIndex: 1,
+        endRowIndex: 1000,
+        startColumnIndex: 11,
         endColumnIndex: 12,
       },
       rule: {
@@ -290,7 +270,6 @@ async function setupSheetFormatting(auth, sheetName) {
     },
   });
   
-  // Data validation for Assigned To column (column H, index 7) - pull from Contractors tab
   requests.push({
     setDataValidation: {
       range: {
@@ -304,7 +283,7 @@ async function setupSheetFormatting(auth, sheetName) {
         condition: {
           type: 'ONE_OF_RANGE',
           values: [{
-            userEnteredValue: `=${CONTRACTORS_TAB_NAME}!A2:A1000`, // Contractor names from Contractors tab
+            userEnteredValue: `=${CONTRACTORS_TAB_NAME}!A2:A1000`,
           }],
         },
         showCustomUi: true,
@@ -313,8 +292,6 @@ async function setupSheetFormatting(auth, sheetName) {
     },
   });
   
-  // Conditional formatting for Status column (green for Closed, red for Open)
-  // Green for Closed
   requests.push({
     addConditionalFormatRule: {
       rule: {
@@ -339,7 +316,6 @@ async function setupSheetFormatting(auth, sheetName) {
     },
   });
   
-  // Red for Open
   requests.push({
     addConditionalFormatRule: {
       rule: {
@@ -374,12 +350,6 @@ async function setupSheetFormatting(auth, sheetName) {
     resource: { requests },
   });
   
-  // Set up formula for Days Old column (column B, index 1)
-  // Formula handles ISO timestamps (2025-12-17T20:55:06.116Z) by extracting date part
-  // Formula: =IF(A2="","",ROUNDDOWN((TODAY()-DATEVALUE(LEFT(A2,10))),0))
-  // This extracts YYYY-MM-DD from ISO timestamp before the 'T'
-  
-  // Get current row count to apply formula
   const valuesResponse = await sheets.spreadsheets.values.get({
     auth,
     spreadsheetId: SPREADSHEET_ID,
@@ -388,10 +358,8 @@ async function setupSheetFormatting(auth, sheetName) {
   
   const rowCount = (valuesResponse.data.values || []).length;
   if (rowCount > 1) {
-    // Apply formula to existing rows
     const formulas = [];
     for (let i = 2; i <= rowCount; i++) {
-      // Extract date part (first 10 characters: YYYY-MM-DD) from ISO timestamp
       formulas.push([`=IF(A${i}="","",ROUNDDOWN((TODAY()-DATEVALUE(LEFT(A${i},10))),0))`]);
     }
     
@@ -407,7 +375,6 @@ async function setupSheetFormatting(auth, sheetName) {
 
 async function applyRowFormatting(auth, projectName) {
   try {
-    // Get the last row number
     const response = await sheets.spreadsheets.values.get({
       auth,
       spreadsheetId: SPREADSHEET_ID,
@@ -418,9 +385,6 @@ async function applyRowFormatting(auth, projectName) {
     if (rowCount < 2) return; // No data rows yet
     
     const lastRow = rowCount;
-    
-    // Apply Days Old formula to the new row
-    // Extract date part (first 10 characters: YYYY-MM-DD) from ISO timestamp
     const formula = `=IF(A${lastRow}="","",ROUNDDOWN((TODAY()-DATEVALUE(LEFT(A${lastRow},10))),0))`;
     await sheets.spreadsheets.values.update({
       auth,
@@ -431,7 +395,6 @@ async function applyRowFormatting(auth, projectName) {
     });
   } catch (error) {
     console.error('Error applying row formatting:', error);
-    // Don't throw - this is not critical
   }
 }
 
@@ -536,17 +499,14 @@ async function getContractorEmails() {
 
     const rows = response.data.values || [];
     if (rows.length < 2) {
-      // Only headers, no contractors
       return {};
     }
 
-    // Skip header row (row 0), map contractor name -> email
     const contractorEmails = {};
     for (let i = 1; i < rows.length; i++) {
       const name = rows[i][0]?.trim();
       const email = rows[i][1]?.trim();
       
-      // Only include contractors with both name and email
       if (name && email) {
         contractorEmails[name] = email;
       }
@@ -595,7 +555,6 @@ async function updateTask(taskId, updateData) {
   const auth = await getSheetsClient();
   
   try {
-    // Get all tasks to find the one to update
     const response = await sheets.spreadsheets.values.get({
       auth,
       spreadsheetId: SPREADSHEET_ID,
@@ -612,12 +571,11 @@ async function updateTask(taskId, updateData) {
     let taskRow = null;
     let projectName = '';
 
-    // Find the task by timestamp (taskId) in column A
     for (let i = 1; i < rows.length; i++) {
       if (rows[i][0] === taskId) {
-        taskRowIndex = i + 1; // +1 because sheets are 1-indexed
-        taskRow = [...rows[i]]; // Copy the row
-        projectName = rows[i][2] || ''; // Project is in column C (index 2)
+        taskRowIndex = i + 1;
+        taskRow = [...rows[i]];
+        projectName = rows[i][2] || '';
         break;
       }
     }
@@ -626,8 +584,6 @@ async function updateTask(taskId, updateData) {
       throw new Error(`Task with ID ${taskId} not found`);
     }
 
-    // Update the row with new data (only update provided fields)
-    // Column mapping: A=timestamp, B=daysOld (formula), C=project, D=area, E=trade, F=taskTitle, G=taskDetails, H=assignedTo, I=priority, J=dueDate, K=photoNeeded, L=status, M=photoUrl, N=notes
     if (updateData.area !== undefined) taskRow[3] = updateData.area;
     if (updateData.trade !== undefined) taskRow[4] = updateData.trade;
     if (updateData.taskTitle !== undefined) taskRow[5] = updateData.taskTitle;
@@ -640,12 +596,10 @@ async function updateTask(taskId, updateData) {
     if (updateData.photoUrl !== undefined) taskRow[12] = updateData.photoUrl;
     if (updateData.notes !== undefined) taskRow[13] = updateData.notes;
 
-    // Ensure row has 14 columns
     while (taskRow.length < 14) {
       taskRow.push('');
     }
 
-    // Update in Master Tasks tab
     await sheets.spreadsheets.values.update({
       auth,
       spreadsheetId: SPREADSHEET_ID,
@@ -654,9 +608,7 @@ async function updateTask(taskId, updateData) {
       resource: { values: [taskRow] },
     });
 
-    // Update in project tab if project name exists
     if (projectName) {
-      // Find the row in project tab
       const projectResponse = await sheets.spreadsheets.values.get({
         auth,
         spreadsheetId: SPREADSHEET_ID,

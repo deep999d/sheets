@@ -9,25 +9,22 @@ class EmailAutomation {
     this.config = {
       smtpHost: config.smtpHost || process.env.SMTP_HOST,
       smtpPort: config.smtpPort || process.env.SMTP_PORT || 587,
-      smtpUser: smtpUser,
+      smtpUser,
       smtpPassword: config.smtpPassword || process.env.SMTP_PASSWORD,
-      fromEmail: fromEmail,
+      fromEmail,
       fromName: config.fromName || process.env.FROM_NAME || 'Legendary Homes Task Management',
     };
 
-    // Store config for contractor emails (fallback if sheet fetch fails)
-    // Priority: config > env variable > empty (will fetch from sheet)
-    if (config && config.subcontractorEmails) {
+    if (config?.subcontractorEmails) {
       this.subcontractorEmails = config.subcontractorEmails;
     } else if (process.env.CONTRACTOR_EMAILS) {
       try {
         this.subcontractorEmails = JSON.parse(process.env.CONTRACTOR_EMAILS);
       } catch (e) {
-        console.warn('Failed to parse CONTRACTOR_EMAILS from environment variable:', e.message);
+        console.warn('Failed to parse CONTRACTOR_EMAILS:', e.message);
         this.subcontractorEmails = {};
       }
     } else {
-      // Will be fetched from Google Sheets
       this.subcontractorEmails = {};
     }
   }
@@ -109,12 +106,10 @@ class EmailAutomation {
       </html>
     `;
 
-    const text = this.generateTextEmail(tasks, subcontractorName);
-
     return {
       subject: `Weekly Task Summary - ${subcontractorName} - ${tasks.length} Open Task${tasks.length !== 1 ? 's' : ''}`,
       html,
-      text,
+      text: this.generateTextEmail(tasks, subcontractorName),
     };
   }
 
@@ -133,8 +128,7 @@ class EmailAutomation {
       text += `   Photo Needed: ${task.photoNeeded === 'Yes' ? 'Yes' : 'No'}\n\n`;
     });
 
-    text += `\nGenerated on ${new Date().toLocaleDateString()}\n`;
-    return text;
+    return text + `\nGenerated on ${new Date().toLocaleDateString()}\n`;
   }
 
   generateNoTasksEmail(subcontractorName) {
@@ -179,27 +173,27 @@ class EmailAutomation {
     try {
       const tasks = await getSubcontractorTasks(subcontractorName);
       const emailAddress = this.subcontractorEmails[subcontractorName];
+      
       if (!emailAddress) {
-        console.warn(`No email address found for ${subcontractorName}`);
-        return { success: false, error: `No email address configured for ${subcontractorName}` };
+        return { 
+          success: false, 
+          error: `No email address configured for ${subcontractorName}` 
+        };
       }
 
       const emailContent = this.generateEmailContent(tasks, subcontractorName);
       const result = await this.sendEmail(emailAddress, emailContent);
-
-      // Check if email was actually sent successfully
-      const emailSuccess = result && !result.error && !result.skipped && 
-                          result.accepted && result.accepted.length > 0;
+      const emailSuccess = result && !result.error && !result.skipped && result.accepted?.length > 0;
 
       return {
         success: emailSuccess,
         subcontractor: subcontractorName,
         taskCount: tasks.length,
-        emailAddress: emailAddress,
+        emailAddress,
         emailSent: result,
         message: emailSuccess 
-          ? `Email sent successfully to ${emailAddress}` 
-          : `Email may not have been delivered. Check spam folder. Response: ${result.response || result.message || 'Unknown'}`,
+          ? `Email sent to ${emailAddress}` 
+          : `Email may not have been delivered. Response: ${result.response || result.message || 'Unknown'}`,
       };
     } catch (error) {
       console.error(`Error sending email to ${subcontractorName}:`, error);
@@ -209,18 +203,15 @@ class EmailAutomation {
 
   async sendEmail(to, emailContent) {
     if (!this.config.smtpHost || !this.config.smtpUser || !this.config.smtpPassword) {
-      console.warn('Email not configured. Skipping email send.');
-      return { skipped: true, message: 'Email configuration not set up. Task saved to Google Sheets only.' };
+      return { skipped: true, message: 'Email not configured' };
     }
 
-    // Validate FROM_EMAIL is set and not a service account email
     if (!this.config.fromEmail || this.config.fromEmail.includes('.iam.gserviceaccount.com')) {
-      console.warn('FROM_EMAIL not set or is a service account email. Using SMTP_USER instead.');
       this.config.fromEmail = this.config.smtpUser;
     }
 
     if (!this.config.fromEmail) {
-      throw new Error('FROM_EMAIL must be set. Please set FROM_EMAIL environment variable or use SMTP_USER email.');
+      throw new Error('FROM_EMAIL must be set');
     }
 
     try {
@@ -231,135 +222,65 @@ class EmailAutomation {
         auth: { user: this.config.smtpUser, pass: this.config.smtpPassword },
       });
 
-      // For Brevo, FROM_EMAIL should match SMTP_USER or be a verified sender
-      // If they don't match, Brevo will use a relay address which can cause delivery issues
-      const fromEmail = this.config.fromEmail;
-      const smtpUser = this.config.smtpUser;
-      
-      // Warn if FROM_EMAIL doesn't match SMTP_USER (common issue with Brevo)
-      if (fromEmail !== smtpUser && this.config.smtpHost?.includes('brevo')) {
-        console.warn(`WARNING: FROM_EMAIL (${fromEmail}) doesn't match SMTP_USER (${smtpUser}). For Brevo, these should match or FROM_EMAIL must be verified in Brevo dashboard.`);
+      if (this.config.fromEmail !== this.config.smtpUser && this.config.smtpHost?.includes('brevo')) {
+        console.warn(`FROM_EMAIL (${this.config.fromEmail}) doesn't match SMTP_USER (${this.config.smtpUser}). For Brevo, these should match.`);
       }
 
-      const mailOptions = {
-        from: `"${this.config.fromName}" <${fromEmail}>`,
+      const result = await transporter.sendMail({
+        from: `"${this.config.fromName}" <${this.config.fromEmail}>`,
         to,
-        replyTo: fromEmail, // Add reply-to header
+        replyTo: this.config.fromEmail,
         subject: emailContent.subject,
         text: emailContent.text,
         html: emailContent.html,
-        headers: {
-          'X-Mailer': 'Legendary Homes Task Management',
-        },
-      };
+        headers: { 'X-Mailer': 'Legendary Homes Task Management' },
+      });
 
-      console.log(`Sending email:`);
-      console.log(`  From: ${fromEmail} (SMTP User: ${smtpUser})`);
-      console.log(`  To: ${to}`);
-      console.log(`  Subject: ${emailContent.subject}`);
-      
-      const result = await transporter.sendMail(mailOptions);
-      
-      console.log(`Email sent successfully:`);
-      console.log(`  Message ID: ${result.messageId}`);
-      console.log(`  Accepted: ${result.accepted?.join(', ') || 'none'}`);
-      console.log(`  Rejected: ${result.rejected?.join(', ') || 'none'}`);
-      console.log(`  Response: ${result.response || 'N/A'}`);
-      
-      // Check if email was actually accepted
-      if (result.rejected && result.rejected.length > 0) {
-        console.error(`WARNING: Email was rejected for: ${result.rejected.join(', ')}`);
+      if (result.rejected?.length > 0) {
+        console.error(`Email rejected for: ${result.rejected.join(', ')}`);
       }
-      
+
       return result;
     } catch (error) {
       console.error('Email send failed:', error.message);
-      console.error('Error details:', error);
       return { error: true, message: error.message };
     }
   }
 
   async sendWeeklyEmails() {
-    // ALWAYS fetch contractor emails from Google Sheets first
     let contractorEmails = {};
     
     try {
-      console.log('Fetching contractor emails from Google Sheets...');
       contractorEmails = await getContractorEmails();
       console.log(`Fetched ${Object.keys(contractorEmails).length} contractor(s) from Google Sheets`);
     } catch (error) {
-      console.warn(`Failed to fetch contractor emails from Google Sheets: ${error.message}. Falling back to config/env...`);
+      console.warn(`Failed to fetch from Google Sheets: ${error.message}. Using fallback...`);
       
-      // Fallback to config/env if sheet fetch fails
       if (this.subcontractorEmails && Object.keys(this.subcontractorEmails).length > 0) {
         contractorEmails = this.subcontractorEmails;
-        console.log(`Using ${Object.keys(contractorEmails).length} contractor(s) from config/env as fallback`);
       } else {
-        const errorMsg = `Failed to fetch contractor emails from Google Sheets: ${error.message}. Please ensure contractors are added to the Contractors tab with email addresses, or set CONTRACTOR_EMAILS environment variable as fallback.`;
-        console.error(errorMsg);
         return [{
           success: false,
-          error: errorMsg
+          error: `Failed to fetch contractor emails: ${error.message}. Add contractors to the Contractors tab or set CONTRACTOR_EMAILS environment variable.`
         }];
       }
     }
     
-    // If sheet returned empty, try fallback
     if (Object.keys(contractorEmails).length === 0 && this.subcontractorEmails && Object.keys(this.subcontractorEmails).length > 0) {
-      console.warn('No contractors found in Google Sheets. Using config/env as fallback...');
       contractorEmails = this.subcontractorEmails;
-    }
-
-    // Validate we have contractor emails
-    if (!contractorEmails || typeof contractorEmails !== 'object') {
-      const errorMsg = 'No subcontractor emails configured. Please add contractors to the Contractors tab in Google Sheets with email addresses, or set CONTRACTOR_EMAILS environment variable.';
-      console.error(errorMsg);
-      return [{
-        success: false,
-        error: errorMsg
-      }];
     }
 
     const contractorNames = Object.keys(contractorEmails);
     if (contractorNames.length === 0) {
-      const errorMsg = 'No contractors with email addresses found. Please add contractors to the Contractors tab in Google Sheets (Column A: Name, Column B: Email).';
-      console.error(errorMsg);
       return [{
         success: false,
-        error: errorMsg
+        error: 'No contractors with email addresses found. Add contractors to the Contractors tab (Column A: Name, Column B: Email).'
       }];
     }
 
-    // Update instance variable for use in sendEmailToSubcontractor
     this.subcontractorEmails = contractorEmails;
-
-    // Log contractor details for debugging
-    console.log(`Found ${contractorNames.length} contractor(s) with email addresses:`);
-    contractorNames.forEach(name => {
-      console.log(`  - ${name}: ${contractorEmails[name]}`);
-    });
-
-    console.log(`Sending weekly emails to ${contractorNames.length} contractor(s): ${contractorNames.join(', ')}`);
-    return Promise.all(
-      contractorNames.map(name => this.sendEmailToSubcontractor(name))
-    );
-  }
-
-  async generateBuildertrendCSV(subcontractorName) {
-    const tasks = await getSubcontractorTasks(subcontractorName);
-    const headers = ['Project', 'Task Title', 'Description', 'Assigned To', 'Due Date', 'Priority', 'Status'];
-    const rows = tasks.map(task => [
-      task.project || '',
-      task.taskTitle || '',
-      task.taskDetails || '',
-      task.assignedTo || '',
-      task.dueDate || '',
-      task.priority || 'Medium',
-      task.status || 'Open',
-    ]);
-    return [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n');
+    return Promise.all(contractorNames.map(name => this.sendEmailToSubcontractor(name)));
   }
 }
 
 module.exports = EmailAutomation;
-
