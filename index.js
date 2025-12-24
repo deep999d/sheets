@@ -131,7 +131,7 @@ if (require.main === module) {
   });
 
   app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({ status: 'ok', message: 'Hi, it works!', timestamp: new Date().toISOString() });
   });
 
   app.post('/api/initialize', async (req, res) => {
