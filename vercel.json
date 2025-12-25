@@ -1,5 +1,8 @@
 {
   "version": 2,
+  "buildCommand": "cd \"Frontend Task Management Page (Copy)\" && npm install && npm run build",
+  "outputDirectory": "Frontend Task Management Page (Copy)/dist",
+  "installCommand": "cd \"Frontend Task Management Page (Copy)\" && npm install",
   "builds": [
     {
       "src": "api/**/*.js",
@@ -8,44 +11,23 @@
   ],
   "routes": [
     {
-      "src": "/api/tasks",
-      "methods": ["GET", "POST", "PUT", "OPTIONS"],
-      "dest": "/api/tasks.js"
-    },
-    {
-      "src": "/api/subcontractor/(?<assignedTo>[^/]+)",
-      "methods": ["GET", "OPTIONS"],
-      "dest": "/api/subcontractor.js?assignedTo=$assignedTo"
-    },
-    {
-      "src": "/api/projects",
-      "methods": ["POST", "OPTIONS"],
-      "dest": "/api/projects.js"
-    },
-    {
-      "src": "/api/initialize",
-      "methods": ["POST", "OPTIONS"],
-      "dest": "/api/initialize.js"
-    },
-    {
-      "src": "/api/contractors",
-      "methods": ["POST", "OPTIONS"],
-      "dest": "/api/contractors.js"
-    },
-    {
-      "src": "/api/emails/weekly",
-      "methods": ["POST", "OPTIONS"],
-      "dest": "/api/emails/weekly.js"
+      "src": "/api/(.*)",
+      "dest": "/api/$1.js"
     },
     {
       "src": "/health",
-      "methods": ["GET"],
       "dest": "/api/health.js"
+    },
+    {
+      "src": "/(.*\\.(js|css|ico|png|jpg|jpeg|svg|woff|woff2|ttf|eot))",
+      "dest": "/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ],
   "env": {
     "NODE_ENV": "production"
   }
 }
-
-

@@ -1,13 +1,20 @@
 # Task Management System
 
-A simple system that manages construction tasks in Google Sheets and sends weekly email summaries to contractors.
+A complete construction task management system with a web interface that stores tasks in Google Sheets and sends weekly email summaries to contractors.
 
 ## What This Does
 
-- Stores all tasks in a Google Sheet
-- Automatically sends weekly email summaries to contractors
-- Organizes tasks by project
-- Tracks task status, priority, and due dates
+- **Web Interface**: Modern React frontend for managing tasks
+- **Google Sheets Integration**: All tasks stored in Google Sheets
+- **Email Automation**: Weekly email summaries to contractors
+- **Project Organization**: Tasks organized by project
+- **Task Tracking**: Status, priority, due dates, and more
+
+## Quick Start
+
+1. Follow the setup guide below to configure Google Sheets and email
+2. Deploy to Vercel (frontend and backend deploy together)
+3. Access the web interface at your Vercel URL
 
 ## Setup Guide
 
@@ -227,6 +234,16 @@ If you get stuck, check:
 2. Google Sheet permissions
 3. Environment variables in Vercel
 
+## Using the Web Interface
+
+After deployment, visit your Vercel URL to access the web interface. You can:
+
+- View all tasks in a table
+- Filter and search tasks
+- Add new tasks
+- Update task status, priority, and details
+- View dashboard with task statistics
+
 ## API Endpoints
 
 - `GET /health` - Check if system is running
@@ -237,3 +254,14 @@ If you get stuck, check:
 - `POST /api/contractors` - Add contractor
 - `POST /api/projects` - Create project tab
 - `POST /api/emails/weekly` - Send weekly emails
+
+## Deployment
+
+The frontend and backend deploy together on Vercel. The `vercel.json` configuration handles:
+
+- Building the React frontend
+- Serving static files
+- Routing API calls to backend functions
+- Serving the frontend for all non-API routes
+
+No separate deployment needed - just push to your repository and Vercel handles everything.
