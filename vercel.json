@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "buildCommand": "cd \"Frontend Task Management Page (Copy)\" && npm install && npm run build",
-  "outputDirectory": "Frontend Task Management Page (Copy)/dist",
-  "installCommand": "cd \"Frontend Task Management Page (Copy)\" && npm install",
+  "buildCommand": "cd \"Frontend Task Management Page\" && npm install && npm run build",
+  "outputDirectory": "Frontend Task Management Page/dist",
+  "installCommand": "cd \"Frontend Task Management Page\" && npm install",
   "builds": [
     {
       "src": "api/**/*.js",
@@ -19,8 +19,10 @@
       "dest": "/api/health.js"
     },
     {
-      "src": "/(.*\\.(js|css|ico|png|jpg|jpeg|svg|woff|woff2|ttf|eot))",
-      "dest": "/$1"
+      "src": "/(.*\\.(js|css|ico|png|jpg|jpeg|svg|woff|woff2|ttf|eot|json))",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      }
     },
     {
       "src": "/(.*)",
