@@ -18,6 +18,10 @@
       "dest": "/api/health.js"
     },
     {
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
+    },
+    {
       "src": "/(.*\\.(js|css|ico|png|jpg|jpeg|svg|woff|woff2|ttf|eot|json|webp|map))",
       "dest": "/$1"
     },
