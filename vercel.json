@@ -1,8 +1,13 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "outputDirectory": "Frontend Task Management Page/dist",
   "builds": [
+    {
+      "src": "Frontend Task Management Page/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    },
     {
       "src": "api/**/*.js",
       "use": "@vercel/node"
