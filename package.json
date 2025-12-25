@@ -4,6 +4,7 @@
   "description": "Construction task management system with Google Sheets integration",
   "main": "index.js",
   "scripts": {
+    "build": "cd \"Frontend Task Management Page\" && npm install && npm run build",
     "start": "node index.js"
   },
   "keywords": [

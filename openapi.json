@@ -22,47 +22,47 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
+                    "type": "object",
                 "description": "Request body accepts either a single task object or an array of tasks. For a single task, include the task properties directly. For batch processing, send an array of task objects.",
-                "properties": {
-                  "project": {
-                    "type": "string",
+                    "properties": {
+                      "project": {
+                        "type": "string",
                     "description": "Project/home name (e.g., 'Grandin', 'Maple Street') - required for single task"
-                  },
-                  "area": {
-                    "type": "string",
-                    "description": "Area of the home (e.g., 'Kitchen', 'Master Bath', 'Rear Retaining Wall')"
-                  },
-                  "trade": {
-                    "type": "string",
+                      },
+                      "area": {
+                        "type": "string",
+                        "description": "Area of the home (e.g., 'Kitchen', 'Master Bath', 'Rear Retaining Wall')"
+                      },
+                      "trade": {
+                        "type": "string",
                     "description": "Trade/subcontractor type (e.g., 'Masonry', 'Tile', 'Plumbing', 'Electrical', 'Carpentry') - required for single task"
-                  },
-                  "taskTitle": {
-                    "type": "string",
+                      },
+                      "taskTitle": {
+                        "type": "string",
                     "description": "Brief task title (e.g., 'Chipped Block', 'Leaky Faucet') - required for single task"
-                  },
-                  "taskDetails": {
-                    "type": "string",
-                    "description": "Detailed description of the task"
-                  },
-                  "assignedTo": {
-                    "type": "string",
+                      },
+                      "taskDetails": {
+                        "type": "string",
+                        "description": "Detailed description of the task"
+                      },
+                      "assignedTo": {
+                        "type": "string",
                     "description": "Person or company assigned (e.g., 'Masonry', 'John Smith', 'ABC Plumbing') - required for single task"
-                  },
-                  "priority": {
-                    "type": "string",
-                    "enum": ["Low", "Medium", "High", "Urgent"],
-                    "description": "Task priority level",
-                    "default": "Medium"
-                  },
-                  "dueDate": {
-                    "type": "string",
-                    "description": "Due date in YYYY-MM-DD format"
-                  },
-                  "photoNeeded": {
-                    "type": "boolean",
-                    "description": "Whether a photo is needed for this task",
-                    "default": false
+                      },
+                      "priority": {
+                        "type": "string",
+                        "enum": ["Low", "Medium", "High", "Urgent"],
+                        "description": "Task priority level",
+                        "default": "Medium"
+                      },
+                      "dueDate": {
+                        "type": "string",
+                        "description": "Due date in YYYY-MM-DD format"
+                      },
+                      "photoNeeded": {
+                        "type": "boolean",
+                        "description": "Whether a photo is needed for this task",
+                        "default": false
                   },
                   "tasks": {
                     "type": "array",

@@ -7,5 +7,7 @@ demo-export
 *.json
 !package.json
 !package-lock.json
+!vercel.json
 legendary-home-*.json
-
+Frontend Task Management Page/node_modules
+Frontend Task Management Page/dist
