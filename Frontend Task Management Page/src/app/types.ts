@@ -1,6 +1,11 @@
 export type TaskStatus = 'Open' | 'Closed' | 'In Progress' | 'Blocked';
 export type TaskPriority = 'Low' | 'Medium' | 'High' | 'Urgent';
 
+export interface Project {
+  id: string;
+  name: string;
+}
+
 export interface Task {
   id: string;
   timestamp: Date;

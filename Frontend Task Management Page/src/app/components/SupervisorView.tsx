@@ -152,7 +152,7 @@ export function SupervisorView({ tasks, projects, onAddTask, onUpdateTask, onAdd
             <div className="space-y-2">
               <Label htmlFor="project">Project *</Label>
               <div className="flex gap-2">
-                <Select value={selectedProject} onValueChange={setSelectedProject}>
+                <Select value={selectedProject || undefined} onValueChange={setSelectedProject}>
                   <SelectTrigger id="project">
                     <SelectValue placeholder="Select project" />
                   </SelectTrigger>
@@ -236,7 +236,7 @@ export function SupervisorView({ tasks, projects, onAddTask, onUpdateTask, onAdd
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="trade">Trade *</Label>
-              <Select value={trade} onValueChange={setTrade}>
+              <Select value={trade || undefined} onValueChange={setTrade}>
                 <SelectTrigger id="trade">
                   <SelectValue placeholder="Select trade" />
                 </SelectTrigger>
@@ -250,7 +250,7 @@ export function SupervisorView({ tasks, projects, onAddTask, onUpdateTask, onAdd
 
             <div className="space-y-2">
               <Label htmlFor="assignedTo">Assign To *</Label>
-              <Select value={assignedTo} onValueChange={setAssignedTo}>
+              <Select value={assignedTo || undefined} onValueChange={setAssignedTo}>
                 <SelectTrigger id="assignedTo">
                   <SelectValue placeholder="Select subcontractor" />
                 </SelectTrigger>
@@ -264,7 +264,7 @@ export function SupervisorView({ tasks, projects, onAddTask, onUpdateTask, onAdd
 
             <div className="space-y-2">
               <Label htmlFor="priority">Priority</Label>
-              <Select value={priority} onValueChange={(val) => setPriority(val as TaskPriority)}>
+              <Select value={priority || undefined} onValueChange={(val) => setPriority(val as TaskPriority)}>
                 <SelectTrigger id="priority">
                   <SelectValue />
                 </SelectTrigger>

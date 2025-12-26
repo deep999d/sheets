@@ -33,6 +33,9 @@ interface TaskTableProps {
   onUpdateTask: (taskId: string, updates: Partial<Task>) => void | Promise<void>;
   onDeleteTask: (taskId: string) => void | Promise<void>;
   onAddTask: (task: Omit<Task, 'id' | 'timestamp'>) => void | Promise<void>;
+  canAdd?: boolean;
+  canDelete?: boolean;
+  canExport?: boolean;
 }
 
 type SortField = keyof Task;
@@ -40,7 +43,7 @@ type SortDirection = 'asc' | 'desc' | null;
 
 const trades = ['Tile', 'Plumbing', 'Landscaping', 'Electrical', 'Drywall', 'Paint', 'HVAC', 'Flooring', 'Cabinets', 'Framing', 'Other'];
 
-export function TaskTable({ tasks, onUpdateTask, onDeleteTask, onAddTask }: TaskTableProps) {
+export function TaskTable({ tasks, onUpdateTask, onDeleteTask, onAddTask, canAdd = true, canDelete = true, canExport = true }: TaskTableProps) {
   const [filters, setFilters] = useState<FilterState>({
     search: '',
     project: 'all',
@@ -75,10 +78,10 @@ export function TaskTable({ tasks, onUpdateTask, onDeleteTask, onAddTask }: Task
   });
 
   // Get unique values for filters
-  const projects = useMemo(() => Array.from(new Set(tasks.map(t => t.project))).sort(), [tasks]);
-  const areas = useMemo(() => Array.from(new Set(tasks.map(t => t.area))).sort(), [tasks]);
-  const tradeList = useMemo(() => Array.from(new Set(tasks.map(t => t.trade))).sort(), [tasks]);
-  const assignees = useMemo(() => Array.from(new Set(tasks.map(t => t.assignedTo))).sort(), [tasks]);
+  const projects = useMemo(() => Array.from(new Set(tasks.map(t => t.project).filter(p => p && p.trim()))).sort(), [tasks]);
+  const areas = useMemo(() => Array.from(new Set(tasks.map(t => t.area).filter(a => a && a.trim()))).sort(), [tasks]);
+  const tradeList = useMemo(() => Array.from(new Set(tasks.map(t => t.trade).filter(t => t && t.trim()))).sort(), [tasks]);
+  const assignees = useMemo(() => Array.from(new Set(tasks.map(t => t.assignedTo).filter(a => a && a.trim()))).sort(), [tasks]);
 
   // Filter and sort tasks
   const filteredAndSortedTasks = useMemo(() => {
@@ -151,33 +154,72 @@ export function TaskTable({ tasks, onUpdateTask, onDeleteTask, onAddTask }: Task
     }
   };
 
-  const handleExport = () => {
-    const csv = [
-      ['Timestamp', 'Project', 'Area', 'Trade', 'Task Title', 'Task Details', 'Assigned To', 'Priority', 'Due Date', 'Photo Needed', 'Status', 'Photo URL', 'Notes'],
-      ...filteredAndSortedTasks.map(t => [
-        t.timestamp.toISOString(),
-        t.project,
-        t.area,
-        t.trade,
-        t.taskTitle,
-        t.taskDetails,
-        t.assignedTo,
-        t.priority,
-        t.dueDate?.toLocaleDateString() || '',
-        t.photoNeeded ? 'Yes' : 'No',
-        t.status,
-        t.photoURL || '',
-        t.notes || ''
-      ])
-    ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
-
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `tasks-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    toast.success('Tasks exported to CSV');
+  const handleExport = async () => {
+    try {
+      const jsPDF = (await import('jspdf')).default;
+      const doc = new jsPDF();
+      
+      // Set up PDF document
+      doc.setFontSize(16);
+      doc.text('Task Management Report', 14, 20);
+      doc.setFontSize(10);
+      doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 28);
+      doc.text(`Total Tasks: ${filteredAndSortedTasks.length}`, 14, 34);
+      
+      // Table data
+      const pageHeight = doc.internal.pageSize.height;
+      const rowHeight = 7;
+      const startX = 14;
+      const colWidths = [25, 30, 20, 20, 40, 30, 20, 20, 25];
+      
+      // Headers
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      let yPos = 45;
+      let xPos = startX;
+      const headers = ['Project', 'Area', 'Trade', 'Task Title', 'Assigned To', 'Priority', 'Status', 'Due Date', 'Photo'];
+      headers.forEach((header, i) => {
+        doc.text(header, xPos, yPos);
+        xPos += colWidths[i];
+      });
+      yPos += rowHeight;
+      
+      // Data rows
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      filteredAndSortedTasks.forEach((task) => {
+        if (yPos > pageHeight - 20) {
+          doc.addPage();
+          yPos = 20;
+        }
+        
+        xPos = startX;
+        const row = [
+          task.project || '-',
+          task.area || '-',
+          task.trade || '-',
+          (task.taskTitle || '-').substring(0, 20),
+          (task.assignedTo || '-').substring(0, 15),
+          task.priority || '-',
+          task.status || '-',
+          task.dueDate ? task.dueDate.toLocaleDateString() : '-',
+          task.photoNeeded ? 'Yes' : 'No'
+        ];
+        
+        row.forEach((cell, i) => {
+          const cellText = String(cell).substring(0, Math.floor(colWidths[i] / 2));
+          doc.text(cellText, xPos, yPos);
+          xPos += colWidths[i];
+        });
+        yPos += rowHeight;
+      });
+      
+      // Save PDF
+      doc.save(`tasks-${new Date().toISOString().split('T')[0]}.pdf`);
+      toast.success('Tasks exported to PDF');
+    } catch (error) {
+      toast.error(`Failed to export PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   const handleAddTask = async () => {
@@ -207,7 +249,7 @@ export function TaskTable({ tasks, onUpdateTask, onDeleteTask, onAddTask }: Task
       });
       setShowAddDialog(false);
     } catch (error) {
-      console.error('Error adding task:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to add task');
     }
   };
 
@@ -306,12 +348,14 @@ export function TaskTable({ tasks, onUpdateTask, onDeleteTask, onAddTask }: Task
             </div>
             <div className="flex gap-2">
               <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="size-4 mr-2" />
-                    Add Task
-                  </Button>
-                </DialogTrigger>
+                {canAdd && (
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="size-4 mr-2" />
+                      Add Task
+                    </Button>
+                  </DialogTrigger>
+                )}
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Add New Task</DialogTitle>
@@ -339,7 +383,7 @@ export function TaskTable({ tasks, onUpdateTask, onDeleteTask, onAddTask }: Task
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Trade</Label>
-                        <Select value={newTask.trade} onValueChange={(val) => setNewTask({ ...newTask, trade: val })}>
+                        <Select value={newTask.trade || undefined} onValueChange={(val) => setNewTask({ ...newTask, trade: val })}>
                           <SelectTrigger>
                             <SelectValue placeholder="Select trade" />
                           </SelectTrigger>
@@ -377,7 +421,7 @@ export function TaskTable({ tasks, onUpdateTask, onDeleteTask, onAddTask }: Task
                     <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label>Priority</Label>
-                        <Select value={newTask.priority} onValueChange={(val) => setNewTask({ ...newTask, priority: val as TaskPriority })}>
+                        <Select value={newTask.priority || undefined} onValueChange={(val) => setNewTask({ ...newTask, priority: val as TaskPriority })}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
@@ -391,7 +435,7 @@ export function TaskTable({ tasks, onUpdateTask, onDeleteTask, onAddTask }: Task
                       </div>
                       <div className="space-y-2">
                         <Label>Status</Label>
-                        <Select value={newTask.status} onValueChange={(val) => setNewTask({ ...newTask, status: val as TaskStatus })}>
+                        <Select value={newTask.status || undefined} onValueChange={(val) => setNewTask({ ...newTask, status: val as TaskStatus })}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
@@ -435,10 +479,12 @@ export function TaskTable({ tasks, onUpdateTask, onDeleteTask, onAddTask }: Task
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
-              <Button variant="outline" onClick={handleExport}>
-                <Download className="size-4 mr-2" />
-                Export
-              </Button>
+              {canExport && (
+                <Button variant="outline" onClick={handleExport}>
+                  <Download className="size-4 mr-2" />
+                  Export
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -455,7 +501,7 @@ export function TaskTable({ tasks, onUpdateTask, onDeleteTask, onAddTask }: Task
               />
             </div>
 
-            <Select value={filters.project} onValueChange={(val) => setFilters({ ...filters, project: val })}>
+            <Select value={filters.project || undefined} onValueChange={(val) => setFilters({ ...filters, project: val })}>
               <SelectTrigger>
                 <SelectValue placeholder="All Projects" />
               </SelectTrigger>
@@ -465,7 +511,7 @@ export function TaskTable({ tasks, onUpdateTask, onDeleteTask, onAddTask }: Task
               </SelectContent>
             </Select>
 
-            <Select value={filters.area} onValueChange={(val) => setFilters({ ...filters, area: val })}>
+            <Select value={filters.area || undefined} onValueChange={(val) => setFilters({ ...filters, area: val })}>
               <SelectTrigger>
                 <SelectValue placeholder="All Areas" />
               </SelectTrigger>
@@ -475,7 +521,7 @@ export function TaskTable({ tasks, onUpdateTask, onDeleteTask, onAddTask }: Task
               </SelectContent>
             </Select>
 
-            <Select value={filters.trade} onValueChange={(val) => setFilters({ ...filters, trade: val })}>
+            <Select value={filters.trade || undefined} onValueChange={(val) => setFilters({ ...filters, trade: val })}>
               <SelectTrigger>
                 <SelectValue placeholder="All Trades" />
               </SelectTrigger>
@@ -485,7 +531,7 @@ export function TaskTable({ tasks, onUpdateTask, onDeleteTask, onAddTask }: Task
               </SelectContent>
             </Select>
 
-            <Select value={filters.assignedTo} onValueChange={(val) => setFilters({ ...filters, assignedTo: val })}>
+            <Select value={filters.assignedTo || undefined} onValueChange={(val) => setFilters({ ...filters, assignedTo: val })}>
               <SelectTrigger>
                 <SelectValue placeholder="All Assignees" />
               </SelectTrigger>
@@ -495,7 +541,7 @@ export function TaskTable({ tasks, onUpdateTask, onDeleteTask, onAddTask }: Task
               </SelectContent>
             </Select>
 
-            <Select value={filters.priority} onValueChange={(val) => setFilters({ ...filters, priority: val })}>
+            <Select value={filters.priority || undefined} onValueChange={(val) => setFilters({ ...filters, priority: val })}>
               <SelectTrigger>
                 <SelectValue placeholder="All Priorities" />
               </SelectTrigger>
@@ -508,7 +554,7 @@ export function TaskTable({ tasks, onUpdateTask, onDeleteTask, onAddTask }: Task
               </SelectContent>
             </Select>
 
-            <Select value={filters.status} onValueChange={(val) => setFilters({ ...filters, status: val })}>
+            <Select value={filters.status || undefined} onValueChange={(val) => setFilters({ ...filters, status: val })}>
               <SelectTrigger>
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
@@ -607,17 +653,17 @@ export function TaskTable({ tasks, onUpdateTask, onDeleteTask, onAddTask }: Task
                         {task.timestamp.toLocaleString()}
                       </TableCell>
                       <TableCell className="font-medium">{task.project}</TableCell>
-                      <TableCell>{task.area}</TableCell>
+                      <TableCell>{task.area || <span className="text-gray-400">-</span>}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{task.trade}</Badge>
+                        <Badge variant="outline">{task.trade || '-'}</Badge>
                       </TableCell>
-                      <TableCell className="font-medium">{task.taskTitle}</TableCell>
+                      <TableCell className="font-medium">{task.taskTitle || <span className="text-gray-400">-</span>}</TableCell>
                       <TableCell className="max-w-xs">
-                        <p className="text-sm truncate" title={task.taskDetails}>
-                          {task.taskDetails}
+                        <p className="text-sm truncate" title={task.taskDetails || ''}>
+                          {task.taskDetails || <span className="text-gray-400">-</span>}
                         </p>
                       </TableCell>
-                      <TableCell>{task.assignedTo}</TableCell>
+                      <TableCell>{task.assignedTo || <span className="text-gray-400">-</span>}</TableCell>
                       <TableCell>
                         <Badge variant={getPriorityColor(task.priority)}>
                           {task.priority}
@@ -662,18 +708,22 @@ export function TaskTable({ tasks, onUpdateTask, onDeleteTask, onAddTask }: Task
                         </Select>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            if (confirm('Are you sure you want to delete this task?')) {
-                              onDeleteTask(task.id);
-                              toast.success('Task deleted');
-                            }
-                          }}
-                        >
-                          <Trash2 className="size-4 text-red-600" />
-                        </Button>
+                        {canDelete ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              if (confirm('Are you sure you want to delete this task?')) {
+                                onDeleteTask(task.id);
+                                toast.success('Task deleted');
+                              }
+                            }}
+                          >
+                            <Trash2 className="size-4 text-red-600" />
+                          </Button>
+                        ) : (
+                          <span className="text-gray-400 text-sm">-</span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))

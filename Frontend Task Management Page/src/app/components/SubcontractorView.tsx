@@ -16,18 +16,18 @@ export function SubcontractorView({ tasks }: SubcontractorViewProps) {
 
   // Get unique subcontractors
   const subcontractors = useMemo(() => 
-    Array.from(new Set(tasks.map(t => t.assignedTo))),
+    Array.from(new Set(tasks.map(t => t.assignedTo).filter(a => a && a.trim()))),
     [tasks]
   );
 
   // Filter tasks for selected subcontractor
   const myTasks = useMemo(() => 
-    tasks.filter(t => t.assignedTo === selectedCompany && t.status !== 'completed'),
+    tasks.filter(t => t.assignedTo === selectedCompany && t.status !== 'Closed'),
     [tasks, selectedCompany]
   );
 
   const completedTasks = useMemo(() =>
-    tasks.filter(t => t.assignedTo === selectedCompany && t.status === 'completed'),
+    tasks.filter(t => t.assignedTo === selectedCompany && t.status === 'Closed'),
     [tasks, selectedCompany]
   );
 
@@ -67,7 +67,7 @@ export function SubcontractorView({ tasks }: SubcontractorViewProps) {
             </p>
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-blue-900">View as:</label>
-              <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+              <Select value={selectedCompany || undefined} onValueChange={setSelectedCompany}>
                 <SelectTrigger className="w-64 bg-white">
                   <SelectValue />
                 </SelectTrigger>
