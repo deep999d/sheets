@@ -118,6 +118,7 @@ module.exports = {
 
 if (require.main === module) {
   const express = require('express');
+  const path = require('path');
   const app = express();
   const PORT = process.env.PORT || 3000;
 
@@ -129,6 +130,9 @@ if (require.main === module) {
     if (req.method === 'OPTIONS') return res.sendStatus(200);
     next();
   });
+
+  // Serve static files from public directory
+  app.use(express.static(path.join(__dirname, 'public')));
 
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', message: 'Hi, it works!', timestamp: new Date().toISOString() });
@@ -213,5 +217,16 @@ if (require.main === module) {
     }
   });
 
-  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  // SPA fallback - serve index.html for all non-API routes
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api') && req.path !== '/health') {
+      res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    }
+  });
+
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Frontend available at http://localhost:${PORT}`);
+    console.log(`API available at http://localhost:${PORT}/api`);
+  });
 }
