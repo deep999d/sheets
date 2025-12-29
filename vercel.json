@@ -16,11 +16,15 @@
     {
       "src": "/health",
       "dest": "/api/health.js"
+    },
+    {
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
     }
   ],
   "rewrites": [
     {
-      "source": "/((?!api|health).*)",
+      "source": "/((?!api|health|assets).*)",
       "destination": "/index.html"
     }
   ],
