@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Task, Project } from '../types';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { TrendingUp, AlertTriangle, Clock, CheckCircle2, Home, Users } from 'lucide-react';
 import { Progress } from './ui/progress';
 
@@ -14,27 +14,25 @@ interface OwnerViewProps {
 const COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899'];
 
 export function OwnerView({ tasks, projects }: OwnerViewProps) {
-  // Calculate project health
   const projectHealth = useMemo(() => {
     return projects.map(project => {
-      const projectTasks = tasks.filter(t => t.projectId === project.id);
+      const projectTasks = tasks.filter(t => t.project === project.name);
       const total = projectTasks.length;
-      const completed = projectTasks.filter(t => t.status === 'completed').length;
-      const open = projectTasks.filter(t => t.status === 'open').length;
-      const inProgress = projectTasks.filter(t => t.status === 'in-progress').length;
+      const completed = projectTasks.filter(t => t.status === 'Closed').length;
+      const open = projectTasks.filter(t => t.status === 'Open').length;
+      const inProgress = projectTasks.filter(t => t.status === 'In Progress').length;
       const overdue = projectTasks.filter(t => 
-        t.dueDate && t.dueDate < new Date() && t.status !== 'completed'
+        t.dueDate && t.dueDate < new Date() && t.status !== 'Closed'
       ).length;
       const highPriority = projectTasks.filter(t => 
-        (t.priority === 'high' || t.priority === 'urgent') && t.status !== 'completed'
+        (t.priority === 'High' || t.priority === 'Urgent') && t.status !== 'Closed'
       ).length;
       const avgAge = projectTasks.length > 0 
-        ? projectTasks.reduce((sum, t) => sum + Math.floor((new Date().getTime() - t.createdAt.getTime()) / (1000 * 60 * 60 * 24)), 0) / projectTasks.length 
+        ? projectTasks.reduce((sum, t) => sum + Math.floor((new Date().getTime() - t.timestamp.getTime()) / (1000 * 60 * 60 * 24)), 0) / projectTasks.length 
         : 0;
       
       const completionRate = total > 0 ? (completed / total) * 100 : 0;
       
-      // Determine health status
       let health: 'excellent' | 'good' | 'attention' | 'critical';
       if (overdue > 0 || highPriority > 3) health = 'critical';
       else if (avgAge > 10 || open > 5) health = 'attention';
@@ -56,10 +54,9 @@ export function OwnerView({ tasks, projects }: OwnerViewProps) {
     });
   }, [tasks, projects]);
 
-  // Tasks by trade
   const tasksByTrade = useMemo(() => {
     const tradeMap = new Map<string, number>();
-    tasks.filter(t => t.status !== 'completed').forEach(task => {
+    tasks.filter(t => t.status !== 'Closed').forEach(task => {
       tradeMap.set(task.trade, (tradeMap.get(task.trade) || 0) + 1);
     });
     return Array.from(tradeMap.entries())
@@ -67,13 +64,12 @@ export function OwnerView({ tasks, projects }: OwnerViewProps) {
       .sort((a, b) => b.value - a.value);
   }, [tasks]);
 
-  // Tasks by subcontractor
   const tasksBySubcontractor = useMemo(() => {
     const subMap = new Map<string, { total: number; completed: number; open: number }>();
     tasks.forEach(task => {
       const existing = subMap.get(task.assignedTo) || { total: 0, completed: 0, open: 0 };
       existing.total++;
-      if (task.status === 'completed') existing.completed++;
+      if (task.status === 'Closed') existing.completed++;
       else existing.open++;
       subMap.set(task.assignedTo, existing);
     });
@@ -88,7 +84,6 @@ export function OwnerView({ tasks, projects }: OwnerViewProps) {
       .sort((a, b) => b.open - a.open);
   }, [tasks]);
 
-  // Status distribution
   const statusDistribution = useMemo(() => {
     const statusMap = new Map<string, number>();
     tasks.forEach(task => {
@@ -97,14 +92,13 @@ export function OwnerView({ tasks, projects }: OwnerViewProps) {
     return Array.from(statusMap.entries()).map(([name, value]) => ({ name, value }));
   }, [tasks]);
 
-  // Overall stats
   const overallStats = useMemo(() => {
     const total = tasks.length;
-    const completed = tasks.filter(t => t.status === 'completed').length;
-    const overdue = tasks.filter(t => t.dueDate && t.dueDate < new Date() && t.status !== 'completed').length;
-    const critical = tasks.filter(t => (t.priority === 'urgent' || t.priority === 'high') && t.status !== 'completed').length;
+    const completed = tasks.filter(t => t.status === 'Closed').length;
+    const overdue = tasks.filter(t => t.dueDate && t.dueDate < new Date() && t.status !== 'Closed').length;
+    const critical = tasks.filter(t => (t.priority === 'Urgent' || t.priority === 'High') && t.status !== 'Closed').length;
     const avgTaskAge = tasks.length > 0
-      ? Math.round(tasks.reduce((sum, t) => sum + Math.floor((new Date().getTime() - t.createdAt.getTime()) / (1000 * 60 * 60 * 24)), 0) / tasks.length)
+      ? Math.round(tasks.reduce((sum, t) => sum + Math.floor((new Date().getTime() - t.timestamp.getTime()) / (1000 * 60 * 60 * 24)), 0) / tasks.length)
       : 0;
     const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
@@ -133,7 +127,6 @@ export function OwnerView({ tasks, projects }: OwnerViewProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
         <CardHeader>
           <CardTitle className="text-purple-900">Executive Dashboard</CardTitle>
@@ -143,7 +136,6 @@ export function OwnerView({ tasks, projects }: OwnerViewProps) {
         </CardHeader>
       </Card>
 
-      {/* Overall Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="pt-6">
@@ -188,7 +180,6 @@ export function OwnerView({ tasks, projects }: OwnerViewProps) {
         </Card>
       </div>
 
-      {/* Project Health Cards */}
       <div>
         <h2 className="text-xl font-semibold mb-4">Project Health Overview</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -198,7 +189,6 @@ export function OwnerView({ tasks, projects }: OwnerViewProps) {
                 <div className="flex items-start justify-between">
                   <div>
                     <CardTitle className="text-lg">{project.name}</CardTitle>
-                    <CardDescription className="text-xs mt-1">{project.address}</CardDescription>
                   </div>
                   <div className="flex items-center gap-1">
                     {getHealthIcon(health)}
@@ -206,11 +196,6 @@ export function OwnerView({ tasks, projects }: OwnerViewProps) {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Phase:</span>
-                  <Badge variant="outline">{project.phase}</Badge>
-                </div>
-                
                 <div className="space-y-1">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Task Completion</span>
@@ -265,9 +250,7 @@ export function OwnerView({ tasks, projects }: OwnerViewProps) {
         </div>
       </div>
 
-      {/* Charts Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Tasks by Trade */}
         <Card>
           <CardHeader>
             <CardTitle>Open Tasks by Trade</CardTitle>
@@ -286,7 +269,6 @@ export function OwnerView({ tasks, projects }: OwnerViewProps) {
           </CardContent>
         </Card>
 
-        {/* Status Distribution */}
         <Card>
           <CardHeader>
             <CardTitle>Task Status Distribution</CardTitle>
@@ -305,7 +287,7 @@ export function OwnerView({ tasks, projects }: OwnerViewProps) {
                   fill="#8884d8"
                   dataKey="value"
                 >
-                  {statusDistribution.map((entry, index) => (
+                  {statusDistribution.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
@@ -316,7 +298,6 @@ export function OwnerView({ tasks, projects }: OwnerViewProps) {
         </Card>
       </div>
 
-      {/* Subcontractor Performance */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -327,7 +308,7 @@ export function OwnerView({ tasks, projects }: OwnerViewProps) {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {tasksBySubcontractor.map((sub, index) => (
+            {tasksBySubcontractor.map((sub) => (
               <div key={sub.name} className="border rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-3">
@@ -347,7 +328,6 @@ export function OwnerView({ tasks, projects }: OwnerViewProps) {
         </CardContent>
       </Card>
 
-      {/* Key Insights */}
       <Card className="border-blue-200 bg-blue-50">
         <CardHeader>
           <CardTitle className="text-blue-900">Key Insights</CardTitle>

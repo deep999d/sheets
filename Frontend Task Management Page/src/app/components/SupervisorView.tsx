@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 interface SupervisorViewProps {
   tasks: Task[];
   projects: Project[];
-  onAddTask: (task: Omit<Task, 'id' | 'createdAt'>) => void;
+  onAddTask: (task: Omit<Task, 'id' | 'timestamp'>) => void;
   onUpdateTask: (taskId: string, updates: Partial<Task>) => void;
   onAddProject: (project: Omit<Project, 'id'>) => void;
 }
@@ -26,36 +26,32 @@ export function SupervisorView({ tasks, projects, onAddTask, onUpdateTask, onAdd
   const [isRecording, setIsRecording] = useState(false);
   const [voiceInput, setVoiceInput] = useState('');
   const [selectedProject, setSelectedProject] = useState('');
-  const [description, setDescription] = useState('');
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskDetails, setTaskDetails] = useState('');
   const [trade, setTrade] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
-  const [priority, setPriority] = useState<TaskPriority>('medium');
-  const [location, setLocation] = useState('');
+  const [priority, setPriority] = useState<TaskPriority>('Medium');
+  const [area, setArea] = useState('');
   const [dueDate, setDueDate] = useState('');
 
-  // New project dialog
   const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectAddress, setNewProjectAddress] = useState('');
-  const [newProjectPhase, setNewProjectPhase] = useState('');
   const [showProjectDialog, setShowProjectDialog] = useState(false);
 
   const handleVoiceToggle = () => {
     if (!isRecording) {
-      // Start recording simulation
       setIsRecording(true);
-      toast.info('Voice recording started - speak naturally while you walk');
+      toast.info('Voice recording started');
     } else {
-      // Stop recording and process
       setIsRecording(false);
       if (voiceInput) {
-        setDescription(voiceInput);
+        setTaskDetails(voiceInput);
         toast.success('Voice input captured');
       }
     }
   };
 
   const handleQuickCreate = () => {
-    if (!selectedProject || !description || !trade || !assignedTo) {
+    if (!selectedProject || !taskTitle || !trade || !assignedTo) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -63,58 +59,56 @@ export function SupervisorView({ tasks, projects, onAddTask, onUpdateTask, onAdd
     const project = projects.find(p => p.id === selectedProject);
     if (!project) return;
 
-    const newTask: Omit<Task, 'id' | 'createdAt'> = {
-      projectId: selectedProject,
-      projectName: project.name,
-      description,
+    const newTask: Omit<Task, 'id' | 'timestamp'> = {
+      project: project.name,
+      area: area || '',
       trade,
+      taskTitle,
+      taskDetails: taskDetails || '',
       assignedTo,
       priority,
-      status: 'open',
-      createdBy: 'Current Supervisor', // In real app, would be from auth
-      location,
-      dueDate: dueDate ? new Date(dueDate) : undefined,
+      dueDate: dueDate ? new Date(dueDate) : null,
+      photoNeeded: false,
+      status: 'Open',
+      notes: '',
     };
 
     onAddTask(newTask);
     
-    // Reset form
-    setDescription('');
+    setTaskTitle('');
+    setTaskDetails('');
     setVoiceInput('');
     setTrade('');
     setAssignedTo('');
-    setPriority('medium');
-    setLocation('');
+    setPriority('Medium');
+    setArea('');
     setDueDate('');
 
     toast.success('Task created successfully');
   };
 
   const handleAddProject = () => {
-    if (!newProjectName || !newProjectAddress) {
-      toast.error('Please fill in project name and address');
+    if (!newProjectName) {
+      toast.error('Please fill in project name');
       return;
     }
 
     onAddProject({
       name: newProjectName,
-      address: newProjectAddress,
-      status: 'in-progress',
-      phase: newProjectPhase || 'Planning',
     });
 
     setNewProjectName('');
-    setNewProjectAddress('');
-    setNewProjectPhase('');
     setShowProjectDialog(false);
     toast.success('Project added successfully');
   };
 
-  const myTasks = tasks.filter(task => task.createdBy === 'Current Supervisor' || task.createdBy === 'John Martinez' || task.createdBy === 'Sarah Chen' || task.createdBy === 'Mike Johnson');
+  const recentTasks = tasks
+    .filter(task => task.status !== 'Closed')
+    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+    .slice(0, 10);
 
   return (
     <div className="space-y-6">
-      {/* Quick Task Creation */}
       <Card>
         <CardHeader>
           <CardTitle>Site Walkthrough Input</CardTitle>
@@ -123,7 +117,6 @@ export function SupervisorView({ tasks, projects, onAddTask, onUpdateTask, onAdd
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Voice Input */}
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Label>Voice Input (Simulated)</Label>
@@ -147,7 +140,6 @@ export function SupervisorView({ tasks, projects, onAddTask, onUpdateTask, onAdd
             )}
           </div>
 
-          {/* Project Selection */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="project">Project *</Label>
@@ -180,27 +172,9 @@ export function SupervisorView({ tasks, projects, onAddTask, onUpdateTask, onAdd
                         <Label htmlFor="project-name">Project Name *</Label>
                         <Input
                           id="project-name"
-                          placeholder="e.g., 123 Oak Street"
+                          placeholder="e.g., Grandin"
                           value={newProjectName}
                           onChange={(e) => setNewProjectName(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="project-address">Address *</Label>
-                        <Input
-                          id="project-address"
-                          placeholder="e.g., 123 Oak Street, Austin, TX"
-                          value={newProjectAddress}
-                          onChange={(e) => setNewProjectAddress(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="project-phase">Current Phase</Label>
-                        <Input
-                          id="project-phase"
-                          placeholder="e.g., Framing, Drywall, Paint"
-                          value={newProjectPhase}
-                          onChange={(e) => setNewProjectPhase(e.target.value)}
                         />
                       </div>
                       <Button onClick={handleAddProject} className="w-full">Add Project</Button>
@@ -211,24 +185,33 @@ export function SupervisorView({ tasks, projects, onAddTask, onUpdateTask, onAdd
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="location">Location</Label>
+              <Label htmlFor="area">Area</Label>
               <Input
-                id="location"
+                id="area"
                 placeholder="e.g., Master Bedroom - West Wall"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
+                value={area}
+                onChange={(e) => setArea(e.target.value)}
               />
             </div>
           </div>
 
-          {/* Task Details */}
           <div className="space-y-2">
-            <Label htmlFor="description">Issue Description *</Label>
+            <Label htmlFor="taskTitle">Task Title *</Label>
+            <Input
+              id="taskTitle"
+              placeholder="Brief task description"
+              value={taskTitle}
+              onChange={(e) => setTaskTitle(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="taskDetails">Issue Description</Label>
             <Textarea
-              id="description"
+              id="taskDetails"
               placeholder="Describe what needs to be fixed..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              value={taskDetails}
+              onChange={(e) => setTaskDetails(e.target.value)}
               className="min-h-20"
             />
           </div>
@@ -269,10 +252,10 @@ export function SupervisorView({ tasks, projects, onAddTask, onUpdateTask, onAdd
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="urgent">Urgent</SelectItem>
+                  <SelectItem value="Low">Low</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="High">High</SelectItem>
+                  <SelectItem value="Urgent">Urgent</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -297,56 +280,55 @@ export function SupervisorView({ tasks, projects, onAddTask, onUpdateTask, onAdd
         </CardContent>
       </Card>
 
-      {/* Recent Tasks */}
       <Card>
         <CardHeader>
-          <CardTitle>My Recent Tasks</CardTitle>
-          <CardDescription>Tasks you've created from site walkthroughs</CardDescription>
+          <CardTitle>Recent Tasks</CardTitle>
+          <CardDescription>Recently created tasks</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {myTasks.length === 0 ? (
+            {recentTasks.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-8">No tasks created yet</p>
             ) : (
-              myTasks.slice(0, 10).map(task => (
+              recentTasks.map(task => (
                 <div key={task.id} className="border rounded-lg p-4 space-y-2">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <Badge variant={
-                          task.status === 'completed' ? 'default' :
-                          task.status === 'in-progress' ? 'secondary' :
-                          task.status === 'blocked' ? 'destructive' : 'outline'
+                          task.status === 'Closed' ? 'default' :
+                          task.status === 'In Progress' ? 'secondary' :
+                          task.status === 'Blocked' ? 'destructive' : 'outline'
                         }>
-                          {task.status === 'completed' && <Check className="size-3 mr-1" />}
-                          {task.status === 'in-progress' && <Clock className="size-3 mr-1" />}
-                          {task.status === 'blocked' && <AlertCircle className="size-3 mr-1" />}
+                          {task.status === 'Closed' && <Check className="size-3 mr-1" />}
+                          {task.status === 'In Progress' && <Clock className="size-3 mr-1" />}
+                          {task.status === 'Blocked' && <AlertCircle className="size-3 mr-1" />}
                           {task.status}
                         </Badge>
                         <Badge variant={
-                          task.priority === 'urgent' || task.priority === 'high' ? 'destructive' :
-                          task.priority === 'medium' ? 'secondary' : 'outline'
+                          task.priority === 'Urgent' || task.priority === 'High' ? 'destructive' :
+                          task.priority === 'Medium' ? 'secondary' : 'outline'
                         }>
                           {task.priority}
                         </Badge>
-                        <span className="text-xs text-gray-500">{task.projectName}</span>
+                        <span className="text-xs text-gray-500">{task.project}</span>
                       </div>
-                      <p className="text-sm">{task.description}</p>
+                      <p className="text-sm font-medium">{task.taskTitle}</p>
+                      {task.taskDetails && <p className="text-sm text-gray-600">{task.taskDetails}</p>}
                       <div className="flex items-center gap-4 mt-2 text-xs text-gray-600">
                         <span>{task.trade} • {task.assignedTo}</span>
-                        {task.location && <span>📍 {task.location}</span>}
+                        {task.area && <span>📍 {task.area}</span>}
                       </div>
                     </div>
-                    {task.status !== 'completed' && (
+                    {task.status !== 'Closed' && (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => onUpdateTask(task.id, { 
-                          status: task.status === 'open' ? 'in-progress' : 'completed',
-                          completedAt: task.status === 'in-progress' ? new Date() : undefined
+                          status: task.status === 'Open' ? 'In Progress' : 'Closed'
                         })}
                       >
-                        {task.status === 'open' ? 'Start' : 'Complete'}
+                        {task.status === 'Open' ? 'Start' : 'Complete'}
                       </Button>
                     )}
                   </div>

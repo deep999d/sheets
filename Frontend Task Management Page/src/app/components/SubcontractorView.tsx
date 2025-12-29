@@ -1,7 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Task } from '../types';
 import { Mail, CheckCircle2, Clock, AlertCircle, Calendar, MapPin } from 'lucide-react';
@@ -12,15 +11,19 @@ interface SubcontractorViewProps {
 }
 
 export function SubcontractorView({ tasks }: SubcontractorViewProps) {
-  const [selectedCompany, setSelectedCompany] = useState<string>('ABC Framing Co');
-
-  // Get unique subcontractors
   const subcontractors = useMemo(() => 
     Array.from(new Set(tasks.map(t => t.assignedTo).filter(a => a && a.trim()))),
     [tasks]
   );
 
-  // Filter tasks for selected subcontractor
+  const [selectedCompany, setSelectedCompany] = useState<string>('');
+
+  useEffect(() => {
+    if (subcontractors.length > 0 && !selectedCompany) {
+      setSelectedCompany(subcontractors[0]);
+    }
+  }, [subcontractors, selectedCompany]);
+
   const myTasks = useMemo(() => 
     tasks.filter(t => t.assignedTo === selectedCompany && t.status !== 'Closed'),
     [tasks, selectedCompany]
@@ -31,12 +34,12 @@ export function SubcontractorView({ tasks }: SubcontractorViewProps) {
     [tasks, selectedCompany]
   );
 
-  // Group by project
   const tasksByProject = useMemo(() => {
     const grouped = new Map<string, Task[]>();
     myTasks.forEach(task => {
-      const existing = grouped.get(task.projectName) || [];
-      grouped.set(task.projectName, [...existing, task]);
+      const project = task.project || 'Unassigned';
+      const existing = grouped.get(project) || [];
+      grouped.set(project, [...existing, task]);
     });
     return grouped;
   }, [myTasks]);
@@ -47,9 +50,18 @@ export function SubcontractorView({ tasks }: SubcontractorViewProps) {
     return days;
   };
 
+  if (!selectedCompany) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <p className="text-center text-gray-500">No subcontractors found</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-blue-900">
@@ -82,7 +94,6 @@ export function SubcontractorView({ tasks }: SubcontractorViewProps) {
         </CardContent>
       </Card>
 
-      {/* Summary Stats */}
       <div className="grid grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-6">
@@ -96,7 +107,7 @@ export function SubcontractorView({ tasks }: SubcontractorViewProps) {
           <CardContent className="pt-6">
             <div className="text-center">
               <div className="text-3xl font-bold text-red-600">
-                {myTasks.filter(t => t.priority === 'high' || t.priority === 'urgent').length}
+                {myTasks.filter(t => t.priority === 'High' || t.priority === 'Urgent').length}
               </div>
               <div className="text-xs text-gray-600 mt-1">High Priority</div>
             </div>
@@ -112,7 +123,6 @@ export function SubcontractorView({ tasks }: SubcontractorViewProps) {
         </Card>
       </div>
 
-      {/* Email Preview */}
       <Card>
         <CardHeader className="bg-gray-50 border-b">
           <div className="space-y-1">
@@ -160,13 +170,13 @@ export function SubcontractorView({ tasks }: SubcontractorViewProps) {
                                   <span className="font-medium text-gray-700">
                                     Item #{index + 1}
                                   </span>
-                                  {task.priority === 'high' || task.priority === 'urgent' ? (
+                                  {task.priority === 'High' || task.priority === 'Urgent' ? (
                                     <Badge variant="destructive" className="gap-1">
                                       <AlertCircle className="size-3" />
                                       {task.priority}
                                     </Badge>
                                   ) : null}
-                                  {task.status === 'in-progress' && (
+                                  {task.status === 'In Progress' && (
                                     <Badge variant="secondary" className="gap-1">
                                       <Clock className="size-3" />
                                       In Progress
@@ -182,13 +192,16 @@ export function SubcontractorView({ tasks }: SubcontractorViewProps) {
                                   )}
                                 </div>
 
-                                <p className="text-sm font-medium mb-1">{task.description}</p>
+                                <p className="text-sm font-medium mb-1">{task.taskTitle}</p>
+                                {task.taskDetails && (
+                                  <p className="text-sm text-gray-600 mb-2">{task.taskDetails}</p>
+                                )}
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3 text-sm text-gray-600">
-                                  {task.location && (
+                                  {task.area && (
                                     <div className="flex items-center gap-1">
                                       <MapPin className="size-4" />
-                                      <span>Location: {task.location}</span>
+                                      <span>Location: {task.area}</span>
                                     </div>
                                   )}
                                   {task.dueDate && (
@@ -207,10 +220,10 @@ export function SubcontractorView({ tasks }: SubcontractorViewProps) {
                                     </div>
                                   )}
                                   <div className="flex items-center gap-1">
-                                    <span>Created: {task.createdAt.toLocaleDateString()}</span>
+                                    <span>Created: {task.timestamp.toLocaleDateString()}</span>
                                   </div>
                                   <div className="flex items-center gap-1">
-                                    <span>By: {task.createdBy}</span>
+                                    <span>Trade: {task.trade}</span>
                                   </div>
                                 </div>
 
@@ -243,7 +256,6 @@ export function SubcontractorView({ tasks }: SubcontractorViewProps) {
         </CardContent>
       </Card>
 
-      {/* Completed This Week */}
       {completedTasks.length > 0 && (
         <Card className="border-green-200 bg-green-50">
           <CardHeader>
@@ -260,12 +272,15 @@ export function SubcontractorView({ tasks }: SubcontractorViewProps) {
               {completedTasks.slice(0, 5).map(task => (
                 <div key={task.id} className="p-3 bg-white rounded border border-green-200">
                   <div className="flex items-center gap-2 mb-1">
-                    <Badge variant="outline">{task.projectName}</Badge>
+                    <Badge variant="outline">{task.project}</Badge>
                     <span className="text-xs text-gray-500">
-                      Completed {task.completedAt?.toLocaleDateString()}
+                      Completed {task.timestamp.toLocaleDateString()}
                     </span>
                   </div>
-                  <p className="text-sm">{task.description}</p>
+                  <p className="text-sm font-medium">{task.taskTitle}</p>
+                  {task.taskDetails && (
+                    <p className="text-sm text-gray-600 mt-1">{task.taskDetails}</p>
+                  )}
                 </div>
               ))}
             </div>
