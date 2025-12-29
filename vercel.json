@@ -19,7 +19,7 @@
       "destination": "/api/health.js"
     },
     {
-      "source": "/(.*)",
+      "source": "/:path*",
       "destination": "/index.html"
     }
   ],
