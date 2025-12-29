@@ -11,21 +11,21 @@
   ],
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "/api/:path*.js"
+      "source": "/api/(.*)",
+      "destination": "/api/$1.js"
     },
     {
       "source": "/health",
       "destination": "/api/health.js"
     },
     {
-      "source": "/:path*",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
   "headers": [
     {
-      "source": "/assets/:path*",
+      "source": "/assets/(.*)",
       "headers": [
         {
           "key": "Cache-Control",
